@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-barlow), "Barlow", sans-serif;
+  --font-display: var(--font-oswald), "Oswald", sans-serif;
+  --color-ink: #070708;
+  --color-card: #141418;
+  --color-line: #2c2c32;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: #070708;
+  color: #f5f5f5;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.font-display {
+  font-family: var(--font-display), "Oswald", sans-serif;
+}
