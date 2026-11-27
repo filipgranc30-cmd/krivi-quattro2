@@ -176,6 +176,7 @@ export type Action =
       status: AttendanceStatus;
       label: string;
     }
+  | { op: "clearAttendance"; kind: "match" | "training"; targetId: string }
   | { op: "readNotifications" }
   | { op: "addFixture"; fixture: Omit<ManualFixture, "id"> }
   | { op: "updateFixture"; fixture: ManualFixture }

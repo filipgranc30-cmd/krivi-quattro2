@@ -64,7 +64,7 @@ export function AttendancePanel({
   targetId: string;
   attendance: Attendance[];
   mine?: AttendanceStatus;
-  onSet: (status: AttendanceStatus) => void;
+  onSet: (status: AttendanceStatus | null) => void;
   disabled?: boolean;
 }) {
   const rows = attendance.filter((item) => item.targetId === targetId);
@@ -87,7 +87,7 @@ export function AttendancePanel({
                   ? "bg-zinc-200 text-black border-zinc-200"
                   : "border-white/15 text-zinc-300";
           return (
-            <button key={status} type="button" disabled={disabled} onClick={() => onSet(status)} className={`h-12 rounded-xl border text-sm font-bold ${tone}`}>
+            <button key={status} type="button" disabled={disabled} onClick={() => onSet(selected ? null : status)} className={`h-12 rounded-xl border text-sm font-bold ${tone}`}>
               {STATUS_LABEL[status]}
             </button>
           );

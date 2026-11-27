@@ -27,16 +27,20 @@ export default function DashboardPage() {
   const board = match ? opponentBoard(match.opponent, data, snapshot, match.source === "demo") : { rows: [], note: "" };
   const mine = data.attendance.find((item) => item.kind === "match" && item.targetId === match?.key && item.userId === user?.id);
 
-  const setStatus = async (status: AttendanceStatus) => {
+  const setStatus = async (status: AttendanceStatus | null) => {
     if (!match || !when) return;
     setPending(true);
-    await act({
-      op: "attendance",
-      kind: "match",
-      targetId: match.key,
-      status,
-      label: `protiv ${match.opponent}, ${when.weekday} ${when.date} u ${when.time}`,
-    });
+    if (status === null) {
+      await act({ op: "clearAttendance", kind: "match", targetId: match.key });
+    } else {
+      await act({
+        op: "attendance",
+        kind: "match",
+        targetId: match.key,
+        status,
+        label: `protiv ${match.opponent}, ${when.weekday} ${when.date} u ${when.time}`,
+      });
+    }
     setPending(false);
   };
 

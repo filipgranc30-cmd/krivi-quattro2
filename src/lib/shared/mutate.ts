@@ -136,6 +136,15 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       }
       return { db: next, push };
     }
+    case "clearAttendance": {
+      const targetId = clampText(action.targetId, 160);
+      if (!targetId) return { db, error: "Nedostaje događaj." };
+      if (action.kind !== "match" && action.kind !== "training") return { db, error: "Nepoznat događaj." };
+      next.attendance = next.attendance.filter(
+        (item) => !(item.userId === actor.id && item.kind === action.kind && item.targetId === targetId),
+      );
+      return { db: next };
+    }
     case "readNotifications": {
       for (const item of next.notifications) {
         if (item.userId === actor.id) item.read = true;
