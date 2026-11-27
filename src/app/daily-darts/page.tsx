@@ -7,8 +7,10 @@ import { Card, PrimaryButton, SectionTitle } from "@/components/ui";
 import { todayZagreb } from "@/lib/shared/dates";
 import {
   dailyRanking,
+  defaultTournamentId,
   focusDay,
   isDayLocked,
+  isTrialTournament,
   lockInstant,
   memberDayPoints,
   mostPickedPlayer,
@@ -35,6 +37,7 @@ export default function DailyDartsPage() {
     const ids = typeof update === "function" ? update(picked) : update;
     setDraft({ dayId: day?.id ?? "", ids });
   };
+  const [tableId, setTableId] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -54,8 +57,10 @@ export default function DailyDartsPage() {
   const matches = day ? daily.matches.filter((match) => match.dayId === day.id) : [];
   const count = daily.pickCounts.find((item) => item.dayId === day?.id)?.count ?? 0;
   const ranking = day && locked ? dailyRanking({ ...state, picks: daily.revealedPicks }, day.id) : [];
-  const overall = overallRanking(state);
-  const favourite = mostPickedPlayer(state);
+  const tables = tournamentOptions(daily);
+  const selectedTable = tableId || defaultTournamentId(state, today);
+  const overall = overallRanking(state, new Date(now), selectedTable);
+  const favourite = mostPickedPlayer(state, new Date(now), selectedTable);
   const best = overall[0];
 
   const toggle = (playerId: string) => {
@@ -99,7 +104,10 @@ export default function DailyDartsPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-display text-2xl">{formatDay(day.date)}</div>
-              <div className="text-xs text-zinc-400">Zaključavanje u {day.lockTime}</div>
+              <div className="text-xs text-zinc-400">
+                Zaključavanje u {day.lockTime}
+                {matches.some((match) => isTrialTournament(match.tournamentId)) && <span className="ml-2 rounded-full border border-orange-500/50 px-2 py-0.5 text-[10px] text-orange-200">Proba</span>}
+              </div>
             </div>
             <Countdown until={new Date(lockInstant(day)).getTime()} now={now} locked={locked || now >= new Date(lockInstant(day)).getTime()} />
           </div>
@@ -114,7 +122,10 @@ export default function DailyDartsPage() {
             <Card key={match.id} className="space-y-2">
               <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
                 <span>{[match.round, match.startTime].filter(Boolean).join(" · ") || "Meč"}</span>
-                {match.source === "pdc" && <span className="rounded-full border border-orange-500/40 px-2 py-0.5 text-[10px] text-orange-200">PDC</span>}
+                <span className="flex gap-1">
+                  {isTrialTournament(match.tournamentId) && <span className="rounded-full border border-orange-500/50 px-2 py-0.5 text-[10px] text-orange-200">Proba</span>}
+                  {match.source === "pdc" && <span className="rounded-full border border-orange-500/40 px-2 py-0.5 text-[10px] text-orange-200">PDC</span>}
+                </span>
               </div>
               <PickButton name={names.get(match.playerAId) ?? "Igrač"} points={pointsOf(state, day.id, match.playerAId)} selected={picked.includes(match.playerAId)} locked={locked} onClick={() => toggle(match.playerAId)} />
               <PickButton name={names.get(match.playerBId) ?? "Igrač"} points={pointsOf(state, day.id, match.playerBId)} selected={picked.includes(match.playerBId)} locked={locked} onClick={() => toggle(match.playerBId)} />
@@ -147,7 +158,16 @@ export default function DailyDartsPage() {
       )}
 
       <section className="space-y-2">
-        <SectionTitle>UKUPNI POREDAK</SectionTitle>
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle>UKUPNI POREDAK</SectionTitle>
+          {tables.length > 1 && (
+            <select value={selectedTable} onChange={(event) => setTableId(event.target.value)} className="h-10 rounded-xl border border-white/15 bg-black px-2 text-sm">
+              {tables.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}{isTrialTournament(item.id) ? " · Proba" : ""}</option>
+              ))}
+            </select>
+          )}
+        </div>
         {!overall.length && <p className="text-sm text-zinc-400">Poredak se puni nakon zaključavanja dana.</p>}
         {overall.map((row, index) => (
           <Card key={row.userId}>
@@ -169,10 +189,12 @@ export default function DailyDartsPage() {
         <summary className="cursor-pointer font-display text-lg text-orange-300">Bodovanje</summary>
         <ul className="mt-3 space-y-1 text-sm text-zinc-300">
           <li>Pobjeda {daily.scoring.win}</li>
-          <li>Prosjek: {daily.scoring.averagePoint} bod za svaki cijeli bod iznad {daily.scoring.averageBase} (106,02 daje 16, ispod {daily.scoring.averageBase} daje 0)</li>
-          <li>180 = {daily.scoring.oneEighty} · izlaz preko 100 = {daily.scoring.checkoutOver100}</li>
-          <li>Izlaz u 4. ruci = {daily.scoring.checkoutRound4} · izlaz u 5. ruci = {daily.scoring.checkoutRound5}</li>
-          <li>Izlaz bull = {daily.scoring.checkoutBull} · big fish 170 = {daily.scoring.bigFish} · 9-darter = {daily.scoring.nineDarter}</li>
+          <li>Prosjek: {daily.scoring.averagePoint} bod za svaki cijeli bod iznad {daily.scoring.averageBase} (100,20 daje 10)</li>
+          <li>Bacanja od 180 = {daily.scoring.oneEighty} · 140+ = {daily.scoring.oneForty} · 100+ = {daily.scoring.oneHundred}</li>
+          <li>Izlazi: {daily.scoring.checkoutPercentPoint} bod za svakih punih {daily.scoring.checkoutPercentStep}% (4/8 je 50% i daje 5). Bez pokušaja je 0.</li>
+          <li>Izlazi 100+ = {daily.scoring.checkoutOver100}</li>
+          <li>Najveći izlaz, jednom: 100–149 = {daily.scoring.highest100}, 150–169 = {daily.scoring.highest150}, 170 = {daily.scoring.highest170}</li>
+          <li>Primjer: Manby 96,77, 2×180, 5×140+, 14×100+, 4/8, izlaz 72, poraz = 29. Schindler 100,20, 5, 4, 14, 6/15, 1×100+, izlaz 100, pobjeda = 58.</li>
           <li>Bodovi člana su zbroj njegova 4 igrača. Isti igrač može biti odabran drugi dan.</li>
         </ul>
       </details>
@@ -210,6 +232,15 @@ function Countdown({ until, now, locked }: { until: number; now: number; locked:
   const minutes = Math.floor((left % 3600000) / 60000);
   const seconds = Math.floor((left % 60000) / 1000);
   return <div className="font-display text-xl text-orange-300">{hours}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</div>;
+}
+
+function tournamentOptions(daily: { tournamentIds: string[]; matches: { tournamentId?: string; tournamentName?: string }[] }) {
+  const map = new Map<string, string>();
+  for (const id of daily.tournamentIds) map.set(id, id === "10872" ? "Players Championship Finals" : id === "10873" ? "World Championship" : `PDC ${id}`);
+  for (const match of daily.matches) {
+    if (match.tournamentId) map.set(match.tournamentId, match.tournamentName || map.get(match.tournamentId) || match.tournamentId);
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
 }
 
 function formatDay(date: string) {

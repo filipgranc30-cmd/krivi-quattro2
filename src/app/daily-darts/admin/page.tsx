@@ -3,19 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { prepareImage } from "@/lib/client/prepare-image";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
 import type { DailyDartsScoring, DailyDartsStat } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
-
-const STAT_FIELDS: { key: keyof Omit<DailyDartsStat, "matchId" | "playerId" | "won" | "average">; label: string }[] = [
-  { key: "count180", label: "180" },
-  { key: "checkoutBull", label: "Izlaz bull" },
-  { key: "bigFish", label: "Izlaz big fish / 170" },
-  { key: "checkoutRound4", label: "Izlaz u 4. ruci" },
-  { key: "checkoutRound5", label: "Izlaz u 5. ruci" },
-  { key: "nineDarter", label: "9-darter" },
-  { key: "checkoutOver100", label: "Izlaz preko 100" },
-];
 
 export default function DailyDartsAdminPage() {
   const { data, user, act, refresh } = useApp();
@@ -25,7 +16,7 @@ export default function DailyDartsAdminPage() {
   const [date, setDate] = useState("");
   const [lockTime, setLockTime] = useState("13:30");
   const [dayId, setDayId] = useState(daily.days[0]?.id ?? "");
-  const [tournamentId, setTournamentId] = useState(daily.tournamentId || "10873");
+  const [tournamentId, setTournamentId] = useState((daily.tournamentIds || ["10872", "10873"]).join(", "));
   const [syncing, setSyncing] = useState(false);
   const [scoring, setScoring] = useState<Record<keyof DailyDartsScoring, string>>(() =>
     Object.fromEntries((Object.keys(daily.scoring) as (keyof DailyDartsScoring)[]).map((key) => [key, String(daily.scoring[key])])) as Record<keyof DailyDartsScoring, string>,
@@ -53,10 +44,10 @@ export default function DailyDartsAdminPage() {
       <Card className="space-y-3">
         <h2 className="font-display text-lg">PDC raspored</h2>
         <p className="text-xs text-zinc-400">
-          Svjetsko prvenstvo je turnir 10873. Hobby plan dopušta jedan dnevni cron (12:00 zagrebačko zimi). Otvaranje Daily Dartsa dodatno povlači raspored najviše svakih 15 minuta.
+          Aktivni turniri, odvojeni zarezom. 10872 je proba (Players Championship Finals), 10873 je svjetsko prvenstvo. Hobby plan ima jedan dnevni cron, a otvaranje stranice povlači raspored najviše svakih 15 minuta.
         </p>
         <label className="block text-xs text-zinc-400">
-          ID turnira
+          ID-evi turnira
           <input value={tournamentId} onChange={(event) => setTournamentId(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-white/15 bg-black px-3 text-base text-white" />
         </label>
         <GhostButton className="w-full" onClick={() => run({ op: "dailySetTournament", tournamentId })}>Spremi ID</GhostButton>
@@ -86,12 +77,14 @@ export default function DailyDartsAdminPage() {
               ["averageBase", "Prosjek od"],
               ["averagePoint", "Bod po prosjeku"],
               ["oneEighty", "180"],
-              ["checkoutOver100", "Izlaz 100+"],
-              ["checkoutRound4", "4. ruka"],
-              ["checkoutRound5", "5. ruka"],
-              ["checkoutBull", "Bull"],
-              ["bigFish", "170"],
-              ["nineDarter", "9-darter"],
+              ["oneForty", "140+"],
+              ["oneHundred", "100+"],
+              ["checkoutPercentStep", "Izlaz % korak"],
+              ["checkoutPercentPoint", "Bod po koraku"],
+              ["checkoutOver100", "Izlazi 100+"],
+              ["highest100", "Izlaz 100–149"],
+              ["highest150", "Izlaz 150–169"],
+              ["highest170", "Izlaz 170"],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="text-xs text-zinc-400">
@@ -255,32 +248,95 @@ function StatsForm({
           <h3 className="font-semibold">{title}{source === "pdc" ? " · PDC" : ""}</h3>
           {hint && <p className="text-xs text-zinc-500">{hint}</p>}
         </div>
-        <GhostButton onClick={() => onDelete()}>Obriši</GhostButton>
+        <div className="flex gap-2">
+          <label className="inline-flex h-11 cursor-pointer items-center rounded-xl border border-orange-500/40 px-3 text-sm font-semibold text-orange-200">
+            Učitaj sliku
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                setNote("Čitam sliku…");
+                try {
+                  const image = await prepareImage(file);
+                  const body = new FormData();
+                  body.set("image", image, "statistika.jpg");
+                  body.set("playerA", names.get(playerAId) ?? "");
+                  body.set("playerB", names.get(playerBId) ?? "");
+                  const response = await fetch("/api/daily-darts/scan", { method: "POST", body });
+                  const json = (await response.json()) as {
+                    ok?: boolean;
+                    error?: string;
+                    summary?: string;
+                    swapped?: boolean;
+                    weak?: boolean;
+                    winnerPlayer?: "a" | "b" | null;
+                    a?: SideValues;
+                    b?: SideValues;
+                  };
+                  if (!json.ok || !json.a || !json.b) {
+                    setNote(json.error || "Sliku nisam uspio pročitati.");
+                    return;
+                  }
+                  setRows([fill(playerAId, json.a), fill(playerBId, json.b)]);
+                  if (json.winnerPlayer === "a") setWinner(playerAId);
+                  if (json.winnerPlayer === "b") setWinner(playerBId);
+                  setNote(`${json.summary ?? "Pročitano"}. ${json.swapped ? "Strane su zamijenjene prema prezimenima. " : ""}${json.weak ? "Imena se slabo poklapaju, provjeri strane. " : ""}Provjeri brojke prije spremanja.`);
+                } catch (error) {
+                  setNote(error instanceof Error ? error.message : "Sliku nisam učitao.");
+                }
+              }}
+            />
+          </label>
+          <GhostButton onClick={() => onDelete()}>Obriši</GhostButton>
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-[minmax(0,1.3fr)_1fr_1fr] items-center gap-2 text-xs text-zinc-400">
+        <span />
+        <span className="truncate text-center font-semibold text-white">{short(names.get(playerAId))}</span>
+        <span className="truncate text-center font-semibold text-white">{short(names.get(playerBId))}</span>
+        <span>Pobjeda</span>
         {[playerAId, playerBId].map((playerId) => (
-          <button key={playerId} type="button" onClick={() => setWinner(playerId)} className={`h-12 rounded-xl border text-sm font-bold ${winner === playerId ? "border-orange-500 bg-orange-500 text-black" : "border-white/15"}`}>
-            Pobjeda · {names.get(playerId)?.split(" ")[0]}
+          <button key={playerId} type="button" onClick={() => setWinner(playerId)} className={`h-11 rounded-xl border text-sm font-bold ${winner === playerId ? "border-orange-500 bg-orange-500 text-black" : "border-white/15 text-white"}`}>
+            {winner === playerId ? "Da" : "Ne"}
           </button>
         ))}
+        <span>Prosjek (3 strelice)</span>
+        {rows.map((row, index) => (
+          <input key={`avg-${row.playerId}`} inputMode="decimal" value={row.average} onChange={(event) => patch(index, "average", event.target.value)} className={cell} />
+        ))}
+        <span>Bacanja od 180</span>
+        {rows.map((row, index) => (
+          <input key={`180-${row.playerId}`} inputMode="numeric" value={row.count180} onChange={(event) => patch(index, "count180", event.target.value)} className={cell} />
+        ))}
+        <span>Bacanja od 140+</span>
+        {rows.map((row, index) => (
+          <input key={`140-${row.playerId}`} inputMode="numeric" value={row.count140} onChange={(event) => patch(index, "count140", event.target.value)} className={cell} />
+        ))}
+        <span>Bacanja od 100+</span>
+        {rows.map((row, index) => (
+          <input key={`100-${row.playerId}`} inputMode="numeric" value={row.count100} onChange={(event) => patch(index, "count100", event.target.value)} className={cell} />
+        ))}
+        <span>Izlazi</span>
+        {rows.map((row, index) => (
+          <span key={`out-${row.playerId}`} className="flex items-center gap-1">
+            <input inputMode="numeric" aria-label="Pogođeno" value={row.checkoutHits} onChange={(event) => patch(index, "checkoutHits", event.target.value)} className={cell} />
+            <span>/</span>
+            <input inputMode="numeric" aria-label="Pokušaji" value={row.checkoutAttempts} onChange={(event) => patch(index, "checkoutAttempts", event.target.value)} className={cell} />
+          </span>
+        ))}
+        <span>Izlazi 100+</span>
+        {rows.map((row, index) => (
+          <input key={`c100-${row.playerId}`} inputMode="numeric" value={row.checkoutOver100} onChange={(event) => patch(index, "checkoutOver100", event.target.value)} className={cell} />
+        ))}
+        <span>Najveći izlaz</span>
+        {rows.map((row, index) => (
+          <input key={`high-${row.playerId}`} inputMode="numeric" value={row.highestCheckout} onChange={(event) => patch(index, "highestCheckout", event.target.value)} className={cell} />
+        ))}
       </div>
-      {rows.map((row, index) => (
-        <div key={row.playerId} className="space-y-2 rounded-xl border border-white/10 p-2">
-          <div className="text-sm">{names.get(row.playerId)}</div>
-          <label className="block text-xs text-zinc-400">
-            Prosjek
-            <input inputMode="decimal" value={row.average} onChange={(event) => patch(index, "average", event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-white/15 bg-black px-2 text-base text-white" />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {STAT_FIELDS.map((field) => (
-              <label key={field.key} className="text-xs text-zinc-400">
-                {field.label}
-                <input inputMode="numeric" value={row[field.key]} onChange={(event) => patch(index, field.key, event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-white/15 bg-black px-2 text-base text-white" />
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
       {note && <p className="text-sm text-orange-200">{note}</p>}
       <PrimaryButton
         className="w-full"
@@ -290,12 +346,12 @@ function StatsForm({
             won: winner === row.playerId,
             average: Number(row.average.replace(",", ".")) || 0,
             count180: num(row.count180),
-            checkoutBull: num(row.checkoutBull),
-            bigFish: num(row.bigFish),
-            checkoutRound4: num(row.checkoutRound4),
-            checkoutRound5: num(row.checkoutRound5),
-            nineDarter: num(row.nineDarter),
+            count140: num(row.count140),
+            count100: num(row.count100),
+            checkoutHits: num(row.checkoutHits),
+            checkoutAttempts: num(row.checkoutAttempts),
             checkoutOver100: num(row.checkoutOver100),
+            highestCheckout: num(row.highestCheckout),
           }));
           setNote((await onSave(payload)) ?? "Statistika je spremljena.");
         }}
@@ -306,17 +362,48 @@ function StatsForm({
   );
 }
 
+const cell = "h-11 w-full rounded-xl border border-white/15 bg-black px-2 text-center text-base text-white";
+
+function short(name?: string) {
+  return name?.split(" ")[0] || "Igrač";
+}
+
+type SideValues = {
+  average: number;
+  count180: number;
+  count140: number;
+  count100: number;
+  checkoutHits: number;
+  checkoutAttempts: number;
+  checkoutOver100: number;
+  highestCheckout: number;
+};
+
+function fill(playerId: string, side: SideValues) {
+  return {
+    playerId,
+    average: String(side.average).replace(".", ","),
+    count180: String(side.count180),
+    count140: String(side.count140),
+    count100: String(side.count100),
+    checkoutHits: String(side.checkoutHits),
+    checkoutAttempts: String(side.checkoutAttempts),
+    checkoutOver100: String(side.checkoutOver100),
+    highestCheckout: String(side.highestCheckout),
+  };
+}
+
 function blank(playerId: string, stat?: DailyDartsStat) {
   return {
     playerId,
     average: stat ? String(stat.average).replace(".", ",") : "",
     count180: String(stat?.count180 ?? 0),
-    checkoutBull: String(stat?.checkoutBull ?? 0),
-    bigFish: String(stat?.bigFish ?? 0),
-    checkoutRound4: String(stat?.checkoutRound4 ?? 0),
-    checkoutRound5: String(stat?.checkoutRound5 ?? 0),
-    nineDarter: String(stat?.nineDarter ?? 0),
+    count140: String(stat?.count140 ?? 0),
+    count100: String(stat?.count100 ?? 0),
+    checkoutHits: String(stat?.checkoutHits ?? 0),
+    checkoutAttempts: String(stat?.checkoutAttempts ?? 0),
     checkoutOver100: String(stat?.checkoutOver100 ?? 0),
+    highestCheckout: String(stat?.highestCheckout ?? 0),
   };
 }
 

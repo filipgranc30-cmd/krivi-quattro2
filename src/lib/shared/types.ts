@@ -145,12 +145,14 @@ export type DailyDartsScoring = {
   averageBase: number;
   averagePoint: number;
   oneEighty: number;
+  oneForty: number;
+  oneHundred: number;
+  checkoutPercentStep: number;
+  checkoutPercentPoint: number;
   checkoutOver100: number;
-  checkoutRound4: number;
-  checkoutRound5: number;
-  checkoutBull: number;
-  bigFish: number;
-  nineDarter: number;
+  highest100: number;
+  highest150: number;
+  highest170: number;
 };
 
 export type DailyDartsPlayer = { id: string; name: string; externalId?: string };
@@ -167,6 +169,8 @@ export type DailyDartsMatch = {
   /** PDC fixture id when the match was imported. */
   externalId?: string;
   source?: "pdc" | "manual";
+  tournamentId?: string;
+  tournamentName?: string;
 };
 
 export type DailyDartsStat = {
@@ -175,12 +179,12 @@ export type DailyDartsStat = {
   won: boolean;
   average: number;
   count180: number;
-  checkoutBull: number;
-  bigFish: number;
-  checkoutRound4: number;
-  checkoutRound5: number;
-  nineDarter: number;
+  count140: number;
+  count100: number;
+  checkoutHits: number;
+  checkoutAttempts: number;
   checkoutOver100: number;
+  highestCheckout: number;
 };
 
 export type DailyDartsPick = {
@@ -200,7 +204,9 @@ export type DailyDartsState = {
   picks: DailyDartsPick[];
   scoring: DailyDartsScoring;
   reminderSent: string[];
+  /** @deprecated use tournamentIds */
   tournamentId?: string;
+  tournamentIds?: string[];
   lastSyncAt?: string;
   lastSyncMessage?: string;
 };
@@ -214,7 +220,7 @@ export type PublicDailyDarts = {
   myPicks: DailyDartsPick[];
   revealedPicks: DailyDartsPick[];
   pickCounts: { dayId: string; count: number }[];
-  tournamentId: string;
+  tournamentIds: string[];
   lastSyncAt: string;
   lastSyncMessage: string;
 };

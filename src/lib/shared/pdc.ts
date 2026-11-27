@@ -14,7 +14,11 @@ export type PdcFixture = {
   player1: PdcPlayer | null;
   player2: PdcPlayer | null;
   winnerExternalId: string | null;
+  tournamentId?: string;
+  tournamentName?: string;
 };
+
+export type PdcTournamentFeed = { id: string; name: string; fixtures: PdcFixture[] };
 
 export function parsePdcTournament(body: unknown): PdcFixture[] | null {
   const root = asRecord(body);
@@ -22,6 +26,7 @@ export function parsePdcTournament(body: unknown): PdcFixture[] | null {
   const attributes = asRecord(data?.attributes);
   const stages = attributes?.stages;
   if (!attributes || !Array.isArray(stages)) return null;
+  const tournamentName = text(attributes.name);
   const fixtures: PdcFixture[] = [];
   for (const stageRow of stages) {
     const stage = asRecord(stageRow);
@@ -46,10 +51,17 @@ export function parsePdcTournament(body: unknown): PdcFixture[] | null {
         player1,
         player2,
         winnerExternalId: winnerExternalId || null,
+        tournamentName,
       });
     }
   }
   return fixtures;
+}
+
+export function tournamentNameOf(body: unknown): string {
+  const root = asRecord(body);
+  const data = asRecord(root?.data) ?? root;
+  return text(asRecord(data?.attributes)?.name);
 }
 
 export function ukToZagreb(date: string, time: string): { date: string; time: string } | null {
@@ -82,6 +94,7 @@ export function applyPdcImport(state: DailyDartsState, fixtures: PdcFixture[], s
   let winners = 0;
   let skipped = 0;
   const byExternal = new Map(next.players.filter((player) => player.externalId).map((player) => [player.externalId as string, player]));
+  const daySlots = new Map<string, { instant: string; time: string }[]>();
 
   const ensurePlayer = (person: PdcPlayer | null): DailyDartsPlayer | null => {
     if (!person) return null;
@@ -99,22 +112,25 @@ export function applyPdcImport(state: DailyDartsState, fixtures: PdcFixture[], s
   };
 
   for (const fixture of fixtures) {
-    const home = ensurePlayer(fixture.player1);
-    const away = ensurePlayer(fixture.player2);
-    if (!home || !away || home.id === away.id) {
-      skipped += 1;
-      continue;
-    }
     const when = ukToZagreb(fixture.ukDate, fixture.ukTime);
     if (!when) {
       skipped += 1;
       continue;
     }
-    let day = next.days.find((item) => item.date === when.date);
+    const slots = daySlots.get(fixture.ukDate) ?? [];
+    slots.push({ instant: `${fixture.ukDate}T${fixture.ukTime}`, time: when.time });
+    daySlots.set(fixture.ukDate, slots);
+    let day = next.days.find((item) => item.date === fixture.ukDate);
     if (!day) {
-      day = { id: uid(), date: when.date, lockTime: when.time, lockOverridden: false };
+      day = { id: uid(), date: fixture.ukDate, lockTime: when.time, lockOverridden: false };
       next.days.push(day);
       newDays += 1;
+    }
+    const home = ensurePlayer(fixture.player1);
+    const away = ensurePlayer(fixture.player2);
+    if (!home || !away || home.id === away.id) {
+      skipped += 1;
+      continue;
     }
     let match = next.matches.find((item) => item.externalId === fixture.fixtureId);
     if (!match) {
@@ -127,6 +143,8 @@ export function applyPdcImport(state: DailyDartsState, fixtures: PdcFixture[], s
         startTime: when.time,
         externalId: fixture.fixtureId,
         source: "pdc",
+        tournamentId: fixture.tournamentId,
+        tournamentName: fixture.tournamentName,
       };
       next.matches.push(match);
       newMatches += 1;
@@ -137,6 +155,8 @@ export function applyPdcImport(state: DailyDartsState, fixtures: PdcFixture[], s
       match.round = fixture.stage;
       match.startTime = when.time;
       match.source = "pdc";
+      match.tournamentId = fixture.tournamentId;
+      match.tournamentName = fixture.tournamentName;
     }
     if (fixture.status === "Result" && fixture.winnerExternalId) {
       const winner = fixture.winnerExternalId === home.externalId ? home : fixture.winnerExternalId === away.externalId ? away : null;
@@ -146,11 +166,8 @@ export function applyPdcImport(state: DailyDartsState, fixtures: PdcFixture[], s
 
   for (const day of next.days) {
     if (day.lockOverridden) continue;
-    const times = next.matches
-      .filter((match) => match.dayId === day.id && match.source === "pdc" && match.startTime)
-      .map((match) => match.startTime)
-      .sort();
-    if (times[0]) day.lockTime = times[0];
+    const earliest = (daySlots.get(day.date) ?? []).sort((a, b) => a.instant.localeCompare(b.instant))[0];
+    if (earliest) day.lockTime = earliest.time;
   }
 
   next.lastSyncAt = syncedAt;
@@ -181,12 +198,12 @@ function emptyStat(matchId: string, playerId: string, won: boolean): DailyDartsS
     won,
     average: 0,
     count180: 0,
-    checkoutBull: 0,
-    bigFish: 0,
-    checkoutRound4: 0,
-    checkoutRound5: 0,
-    nineDarter: 0,
+    count140: 0,
+    count100: 0,
+    checkoutHits: 0,
+    checkoutAttempts: 0,
     checkoutOver100: 0,
+    highestCheckout: 0,
   };
 }
 
