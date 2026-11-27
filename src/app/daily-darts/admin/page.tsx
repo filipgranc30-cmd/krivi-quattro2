@@ -18,13 +18,15 @@ const STAT_FIELDS: { key: keyof Omit<DailyDartsStat, "matchId" | "playerId" | "w
 ];
 
 export default function DailyDartsAdminPage() {
-  const { data, user, act } = useApp();
+  const { data, user, act, refresh } = useApp();
   const daily = data.dailyDarts;
   const [message, setMessage] = useState("");
   const [names, setNames] = useState(daily.players.map((player) => player.name).join("\n"));
   const [date, setDate] = useState("");
   const [lockTime, setLockTime] = useState("13:30");
   const [dayId, setDayId] = useState(daily.days[0]?.id ?? "");
+  const [tournamentId, setTournamentId] = useState(daily.tournamentId || "10873");
+  const [syncing, setSyncing] = useState(false);
   const [scoring, setScoring] = useState<Record<keyof DailyDartsScoring, string>>(() =>
     Object.fromEntries((Object.keys(daily.scoring) as (keyof DailyDartsScoring)[]).map((key) => [key, String(daily.scoring[key])])) as Record<keyof DailyDartsScoring, string>,
   );
@@ -48,6 +50,32 @@ export default function DailyDartsAdminPage() {
       <Link href="/daily-darts" className="text-sm text-orange-300">← Daily Darts</Link>
       <SectionTitle>DAILY DARTS · ADMIN</SectionTitle>
       {message && <p className="text-sm text-orange-200">{message}</p>}
+      <Card className="space-y-3">
+        <h2 className="font-display text-lg">PDC raspored</h2>
+        <p className="text-xs text-zinc-400">
+          Svjetsko prvenstvo je turnir 10873. Hobby plan dopušta jedan dnevni cron (12:00 zagrebačko zimi). Otvaranje Daily Dartsa dodatno povlači raspored najviše svakih 15 minuta.
+        </p>
+        <label className="block text-xs text-zinc-400">
+          ID turnira
+          <input value={tournamentId} onChange={(event) => setTournamentId(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-white/15 bg-black px-3 text-base text-white" />
+        </label>
+        <GhostButton className="w-full" onClick={() => run({ op: "dailySetTournament", tournamentId })}>Spremi ID</GhostButton>
+        <p className="text-xs text-zinc-500">Zadnje: {daily.lastSyncAt ? new Date(daily.lastSyncAt).toLocaleString("hr-HR") : "nije sinkronizirano"}{daily.lastSyncMessage ? ` · ${daily.lastSyncMessage}` : ""}</p>
+        <PrimaryButton
+          className="w-full"
+          disabled={syncing}
+          onClick={async () => {
+            setSyncing(true);
+            const response = await fetch("/api/daily-darts/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) });
+            const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+            setMessage(body.message || body.error || "Sinkronizacija nije uspjela.");
+            await refresh();
+            setSyncing(false);
+          }}
+        >
+          {syncing ? "Sinkroniziram…" : "Sinkroniziraj sada"}
+        </PrimaryButton>
+      </Card>
 
       <Card className="space-y-3">
         <h2 className="font-display text-lg">Bodovanje</h2>
@@ -148,6 +176,7 @@ function MatchEditor({ dayId }: { dayId: string }) {
         <StatsForm
           key={match.id}
           title={`${names.get(match.playerAId) ?? "A"} – ${names.get(match.playerBId) ?? "B"}`}
+          source={match.source}
           hint={[match.round, match.startTime].filter(Boolean).join(" · ")}
           playerAId={match.playerAId}
           playerBId={match.playerBId}
@@ -193,6 +222,7 @@ function PlayerField({ label, players, value, onChange }: { label: string; playe
 
 function StatsForm({
   title,
+  source,
   hint,
   playerAId,
   playerBId,
@@ -202,6 +232,7 @@ function StatsForm({
   onDelete,
 }: {
   title: string;
+  source?: string;
   hint: string;
   playerAId: string;
   playerBId: string;
@@ -221,7 +252,7 @@ function StatsForm({
     <Card className="space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold">{title}</h3>
+          <h3 className="font-semibold">{title}{source === "pdc" ? " · PDC" : ""}</h3>
           {hint && <p className="text-xs text-zinc-500">{hint}</p>}
         </div>
         <GhostButton onClick={() => onDelete()}>Obriši</GhostButton>

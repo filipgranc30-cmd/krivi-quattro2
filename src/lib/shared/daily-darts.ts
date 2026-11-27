@@ -20,8 +20,21 @@ export const TOURNAMENT_END = "2027-01-03";
 export const TEASER_START = "2026-12-01";
 export const TEASER_END = "2027-01-04";
 
+export const DEFAULT_PDC_TOURNAMENT = "10873";
+
 export function defaultDailyDarts(): DailyDartsState {
-  return { players: [], days: [], matches: [], stats: [], picks: [], scoring: { ...DEFAULT_SCORING }, reminderSent: [] };
+  return {
+    players: [],
+    days: [],
+    matches: [],
+    stats: [],
+    picks: [],
+    scoring: { ...DEFAULT_SCORING },
+    reminderSent: [],
+    tournamentId: DEFAULT_PDC_TOURNAMENT,
+    lastSyncAt: "",
+    lastSyncMessage: "",
+  };
 }
 
 export function cloneDailyDarts(state: DailyDartsState | undefined): DailyDartsState {
@@ -34,6 +47,9 @@ export function cloneDailyDarts(state: DailyDartsState | undefined): DailyDartsS
     picks: source.picks.map((item) => ({ ...item, playerIds: [...item.playerIds] })),
     scoring: { ...DEFAULT_SCORING, ...source.scoring },
     reminderSent: [...(source.reminderSent ?? [])],
+    tournamentId: source.tournamentId || DEFAULT_PDC_TOURNAMENT,
+    lastSyncAt: source.lastSyncAt || "",
+    lastSyncMessage: source.lastSyncMessage || "",
   };
 }
 
@@ -129,6 +145,9 @@ export function publicDailyDarts(state: DailyDartsState | undefined, viewer: Use
     myPicks: viewer ? daily.picks.filter((pick) => pick.userId === viewer.id) : [],
     revealedPicks: daily.picks.filter((pick) => locked.has(pick.dayId)),
     pickCounts: daily.days.map((day) => ({ dayId: day.id, count: daily.picks.filter((pick) => pick.dayId === day.id).length })),
+    tournamentId: daily.tournamentId || DEFAULT_PDC_TOURNAMENT,
+    lastSyncAt: daily.lastSyncAt || "",
+    lastSyncMessage: daily.lastSyncMessage || "",
   };
 }
 
@@ -233,8 +252,9 @@ export function applyDailyAction(state: DailyDartsState, actor: UserPublic, acti
     const lockTime = /^\d{2}:\d{2}$/.test(action.day.lockTime) ? action.day.lockTime : "13:30";
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { state, error: "Datum nije ispravan." };
     if (state.days.some((day) => day.date === date && day.id !== action.day.id)) return { state, error: "Taj datum već postoji." };
-    const day: DailyDartsDay = { id: action.day.id || uid(), date, lockTime };
-    const days = state.days.some((item) => item.id === day.id) ? state.days.map((item) => (item.id === day.id ? day : item)) : [...state.days, day];
+    const previous = state.days.find((item) => item.id === action.day.id);
+    const day: DailyDartsDay = { id: action.day.id || previous?.id || uid(), date, lockTime, lockOverridden: true };
+    const days = state.days.some((item) => item.id === day.id) ? state.days.map((item) => (item.id === day.id ? { ...item, ...day } : item)) : [...state.days, day];
     return { state: { ...state, days } };
   }
   if (action.op === "dailyDeleteDay") {
@@ -257,6 +277,7 @@ export function applyDailyAction(state: DailyDartsState, actor: UserPublic, acti
       return { state, error: "Igrač nije na popisu." };
     }
     const startTime = /^\d{2}:\d{2}$/.test(action.match.startTime) ? action.match.startTime : "";
+    const previous = state.matches.find((item) => item.id === action.match.id);
     const match: DailyDartsMatch = {
       id: action.match.id || uid(),
       dayId,
@@ -264,6 +285,8 @@ export function applyDailyAction(state: DailyDartsState, actor: UserPublic, acti
       playerBId,
       round: action.match.round.replace(/\s+/g, " ").trim().slice(0, 40),
       startTime,
+      externalId: previous?.externalId,
+      source: previous?.source ?? "manual",
     };
     const matches = state.matches.some((item) => item.id === match.id) ? state.matches.map((item) => (item.id === match.id ? match : item)) : [...state.matches, match];
     return { state: { ...state, matches } };
@@ -278,6 +301,11 @@ export function applyDailyAction(state: DailyDartsState, actor: UserPublic, acti
     };
   }
   if (action.op === "dailySetStats") return upsertMatchStats(state, action.matchId, action.rows);
+  if (action.op === "dailySetTournament") {
+    const tournamentId = action.tournamentId.trim();
+    if (!/^\d{3,8}$/.test(tournamentId)) return { state, error: "ID turnira je broj, npr. 10873." };
+    return { state: { ...state, tournamentId } };
+  }
   return { state };
 }
 

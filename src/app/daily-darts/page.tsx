@@ -19,7 +19,7 @@ import {
 import type { DailyDartsPick, DailyDartsState, PublicDailyDarts } from "@/lib/shared/types";
 
 export default function DailyDartsPage() {
-  const { data, user, act } = useApp();
+  const { data, user, act, refresh } = useApp();
   const daily = data.dailyDarts;
   const today = todayZagreb();
   const suggested = focusDay(daily.days, today);
@@ -41,8 +41,14 @@ export default function DailyDartsPage() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     fetch("/api/daily-darts/remind", { method: "POST" }).catch(() => undefined);
+    fetch("/api/daily-darts/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      .then((response) => response.json())
+      .then((body: { ok?: boolean; skipped?: boolean }) => {
+        if (body.ok && !body.skipped) refresh();
+      })
+      .catch(() => undefined);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [refresh]);
 
   const names = new Map(daily.players.map((player) => [player.id, player.name]));
   const matches = day ? daily.matches.filter((match) => match.dayId === day.id) : [];
@@ -106,7 +112,10 @@ export default function DailyDartsPage() {
         <div className="space-y-2">
           {matches.map((match) => (
             <Card key={match.id} className="space-y-2">
-              <div className="text-xs text-zinc-500">{[match.round, match.startTime].filter(Boolean).join(" · ") || "Meč"}</div>
+              <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+                <span>{[match.round, match.startTime].filter(Boolean).join(" · ") || "Meč"}</span>
+                {match.source === "pdc" && <span className="rounded-full border border-orange-500/40 px-2 py-0.5 text-[10px] text-orange-200">PDC</span>}
+              </div>
               <PickButton name={names.get(match.playerAId) ?? "Igrač"} points={pointsOf(state, day.id, match.playerAId)} selected={picked.includes(match.playerAId)} locked={locked} onClick={() => toggle(match.playerAId)} />
               <PickButton name={names.get(match.playerBId) ?? "Igrač"} points={pointsOf(state, day.id, match.playerBId)} selected={picked.includes(match.playerBId)} locked={locked} onClick={() => toggle(match.playerBId)} />
             </Card>
@@ -153,6 +162,9 @@ export default function DailyDartsPage() {
         {favourite && <p className="text-sm text-zinc-300">Najbiraniji igrač: {favourite.player.name} ({favourite.count}×).</p>}
       </section>
 
+      <p className="text-center text-xs text-zinc-500">
+        Raspored: <a className="text-orange-300 underline" href="https://www.pdc.tv" target="_blank" rel="noreferrer">PDC</a>
+      </p>
       <details className="rounded-2xl border border-white/10 bg-[#141418] p-4">
         <summary className="cursor-pointer font-display text-lg text-orange-300">Bodovanje</summary>
         <ul className="mt-3 space-y-1 text-sm text-zinc-300">

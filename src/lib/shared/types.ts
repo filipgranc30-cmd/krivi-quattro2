@@ -153,9 +153,9 @@ export type DailyDartsScoring = {
   nineDarter: number;
 };
 
-export type DailyDartsPlayer = { id: string; name: string };
+export type DailyDartsPlayer = { id: string; name: string; externalId?: string };
 
-export type DailyDartsDay = { id: string; date: string; lockTime: string };
+export type DailyDartsDay = { id: string; date: string; lockTime: string; lockOverridden?: boolean };
 
 export type DailyDartsMatch = {
   id: string;
@@ -164,6 +164,9 @@ export type DailyDartsMatch = {
   playerBId: string;
   round: string;
   startTime: string;
+  /** PDC fixture id when the match was imported. */
+  externalId?: string;
+  source?: "pdc" | "manual";
 };
 
 export type DailyDartsStat = {
@@ -197,6 +200,9 @@ export type DailyDartsState = {
   picks: DailyDartsPick[];
   scoring: DailyDartsScoring;
   reminderSent: string[];
+  tournamentId?: string;
+  lastSyncAt?: string;
+  lastSyncMessage?: string;
 };
 
 export type PublicDailyDarts = {
@@ -208,6 +214,9 @@ export type PublicDailyDarts = {
   myPicks: DailyDartsPick[];
   revealedPicks: DailyDartsPick[];
   pickCounts: { dayId: string; count: number }[];
+  tournamentId: string;
+  lastSyncAt: string;
+  lastSyncMessage: string;
 };
 
 export type Member = {
@@ -284,7 +293,8 @@ export type Action =
   | { op: "dailyDeleteMatch"; id: string }
   | { op: "dailySetStats"; matchId: string; rows: Omit<DailyDartsStat, "matchId">[] }
   | { op: "dailySetPicks"; dayId: string; playerIds: string[] }
-  | { op: "dailySetScoring"; scoring: DailyDartsScoring };
+  | { op: "dailySetScoring"; scoring: DailyDartsScoring }
+  | { op: "dailySetTournament"; tournamentId: string };
 
 export type LeagueInfo = { id: number; name: string; group: string };
 
