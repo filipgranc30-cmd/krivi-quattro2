@@ -140,6 +140,76 @@ export type PushSub = {
   auth: string;
 };
 
+export type DailyDartsScoring = {
+  win: number;
+  averageBase: number;
+  averagePoint: number;
+  oneEighty: number;
+  checkoutOver100: number;
+  checkoutRound4: number;
+  checkoutRound5: number;
+  checkoutBull: number;
+  bigFish: number;
+  nineDarter: number;
+};
+
+export type DailyDartsPlayer = { id: string; name: string };
+
+export type DailyDartsDay = { id: string; date: string; lockTime: string };
+
+export type DailyDartsMatch = {
+  id: string;
+  dayId: string;
+  playerAId: string;
+  playerBId: string;
+  round: string;
+  startTime: string;
+};
+
+export type DailyDartsStat = {
+  matchId: string;
+  playerId: string;
+  won: boolean;
+  average: number;
+  count180: number;
+  checkoutBull: number;
+  bigFish: number;
+  checkoutRound4: number;
+  checkoutRound5: number;
+  nineDarter: number;
+  checkoutOver100: number;
+};
+
+export type DailyDartsPick = {
+  id: string;
+  dayId: string;
+  userId: string;
+  userName: string;
+  playerIds: string[];
+  updatedAt: string;
+};
+
+export type DailyDartsState = {
+  players: DailyDartsPlayer[];
+  days: DailyDartsDay[];
+  matches: DailyDartsMatch[];
+  stats: DailyDartsStat[];
+  picks: DailyDartsPick[];
+  scoring: DailyDartsScoring;
+  reminderSent: string[];
+};
+
+export type PublicDailyDarts = {
+  scoring: DailyDartsScoring;
+  players: DailyDartsPlayer[];
+  days: DailyDartsDay[];
+  matches: DailyDartsMatch[];
+  stats: DailyDartsStat[];
+  myPicks: DailyDartsPick[];
+  revealedPicks: DailyDartsPick[];
+  pickCounts: { dayId: string; count: number }[];
+};
+
 export type Member = {
   id: string;
   name: string;
@@ -159,6 +229,7 @@ export type AppData = {
   settings: Settings;
   members: Member[];
   pendingRequests: Member[];
+  dailyDarts: PublicDailyDarts;
 };
 
 export type StoredUser = UserPublic & { passwordHash: string };
@@ -180,6 +251,7 @@ export type Db = {
   games: SavedGame[];
   settings: Settings;
   pushSubs: PushSub[];
+  dailyDarts: DailyDartsState;
 };
 
 export type Action =
@@ -204,7 +276,15 @@ export type Action =
   | { op: "deleteGame"; id: string }
   | { op: "setRole"; userId: string; role: Role }
   | { op: "approveUser"; userId: string }
-  | { op: "rejectUser"; userId: string };
+  | { op: "rejectUser"; userId: string }
+  | { op: "dailySetPlayers"; names: string[] }
+  | { op: "dailyUpsertDay"; day: { id?: string; date: string; lockTime: string } }
+  | { op: "dailyDeleteDay"; id: string }
+  | { op: "dailyUpsertMatch"; match: { id?: string; dayId: string; playerAId: string; playerBId: string; round: string; startTime: string } }
+  | { op: "dailyDeleteMatch"; id: string }
+  | { op: "dailySetStats"; matchId: string; rows: Omit<DailyDartsStat, "matchId">[] }
+  | { op: "dailySetPicks"; dayId: string; playerIds: string[] }
+  | { op: "dailySetScoring"; scoring: DailyDartsScoring };
 
 export type LeagueInfo = { id: number; name: string; group: string };
 

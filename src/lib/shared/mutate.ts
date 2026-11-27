@@ -1,3 +1,4 @@
+import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import type { Action, AppData, Db, Member, NotificationItem, StoredUser, UserPublic } from "./types";
 import { accountStatus } from "./types";
 import { clampText, firstName, normName, uid } from "./util";
@@ -94,6 +95,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
     games: db.games.map((item) => ({ ...item, players: item.players.map((p) => ({ ...p })) })),
     settings: { ...db.settings },
     pushSubs: db.pushSubs.map((item) => ({ ...item })),
+    dailyDarts: cloneDailyDarts(db.dailyDarts),
   };
 
   switch (action.op) {
@@ -297,6 +299,19 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       notifyUsers(next, [user.id], "Pristup", body, "/dashboard");
       return { db: next, push: { title: "Krivi Quattro", body, url: "/dashboard", userIds: [user.id] } };
     }
+    case "dailySetPlayers":
+    case "dailyUpsertDay":
+    case "dailyDeleteDay":
+    case "dailyUpsertMatch":
+    case "dailyDeleteMatch":
+    case "dailySetStats":
+    case "dailySetPicks":
+    case "dailySetScoring": {
+      const result = applyDailyAction(next.dailyDarts, actor, action, actor.role === "admin");
+      if (result.error) return { db, error: result.error };
+      next.dailyDarts = result.state;
+      return { db: next };
+    }
     case "rejectUser": {
       const denied = requireAdmin(actor);
       if (denied) return { db, error: denied };
@@ -415,6 +430,7 @@ export function toPublic(db: Db, viewer: UserPublic | null): AppData {
     settings: db.settings,
     members,
     pendingRequests,
+    dailyDarts: publicDailyDarts(db.dailyDarts, viewer),
   };
 }
 

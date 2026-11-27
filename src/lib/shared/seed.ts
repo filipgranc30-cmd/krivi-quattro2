@@ -1,3 +1,4 @@
+import { defaultDailyDarts } from "./daily-darts";
 import { CLUB_NAME, DEFAULT_TRAINING_TIME, HOME_VENUE } from "./club";
 import type { Db, RosterPlayer, Settings } from "./types";
 import { normName, uid } from "./util";
@@ -66,6 +67,7 @@ export function emptyDb(): Db {
     games: [],
     settings: defaultSettings(),
     pushSubs: [],
+    dailyDarts: defaultDailyDarts(),
   };
 }
 
