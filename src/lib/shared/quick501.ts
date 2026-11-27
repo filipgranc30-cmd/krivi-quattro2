@@ -24,6 +24,8 @@ export type QuickLeg = {
   loserPoints: number;
   winnerAvg: number;
   loserAvg: number;
+  /** 180s in this leg, one count per player, same order as the match. */
+  oneEighties: number[];
 };
 
 export type QuickPlayerSummary = {
@@ -34,6 +36,7 @@ export type QuickPlayerSummary = {
   average: number;
   bestLegDarts: number | null;
   checkout: string | null;
+  count180: number;
 };
 
 export function firstTo(bestOf: number): number {
@@ -103,6 +106,7 @@ export function parseQuickLeg(input: QuickLegInput): { ok: true; leg: QuickLeg }
       loserPoints,
       winnerAvg: round1(threeDartAverage(winnerPoints, thrown)),
       loserAvg: round1(threeDartAverage(loserPoints, against)),
+      oneEighties: [],
     },
   };
 }
@@ -121,6 +125,7 @@ export function summarizeQuickMatch(playerCount: number, legs: QuickLeg[]): Quic
       average: round1(threeDartAverage(points, darts)),
       bestLegDarts: best ? best.winnerDarts : null,
       checkout: best ? checkoutLabel(best.round, best.dart) : null,
+      count180: legs.reduce((sum, leg) => sum + (leg.oneEighties?.[index] || 0), 0),
     };
   });
 }
@@ -139,6 +144,7 @@ export function toSavedPlayers(players: QuickPlayer[], summaries: QuickPlayerSum
       pointsScored: summary.points,
       bestLegDarts: summary.bestLegDarts ?? undefined,
       checkout: summary.checkout ?? undefined,
+      count180: summary.count180,
     };
   });
 }

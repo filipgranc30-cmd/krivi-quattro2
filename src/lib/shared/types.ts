@@ -112,6 +112,8 @@ export type GamePlayerResult = {
   bestLegDarts?: number;
   /** 501: checkout of the best leg, for example "5. ruka, 3. strelica". */
   checkout?: string;
+  /** Cricket quick entry: the round (ruka) of each leg this player won. */
+  winRounds?: number[];
 };
 
 export type SavedGame = {
