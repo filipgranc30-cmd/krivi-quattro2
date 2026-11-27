@@ -25,6 +25,10 @@ export default function MorePage() {
         <div className="mt-1 text-sm text-orange-300">{user?.role === "admin" ? "Admin / trener" : "Član"}</div>
         <GhostButton className="mt-3 w-full" onClick={() => logout()}>Odjava</GhostButton>
       </Card>
+      <Link href="/turniri" className="block rounded-2xl border border-orange-500/40 bg-[#141418] p-4">
+        <div className="font-display text-lg text-orange-300">Turniri</div>
+        <div className="text-xs text-zinc-400">Nadolazeći turniri, Runda Pikada</div>
+      </Link>
       <div className="grid grid-cols-2 gap-3">
         <Link href="/trening" className="rounded-2xl border border-white/10 p-4 font-display text-lg">Trening</Link>
         <Link href="/obavijesti" className="rounded-2xl border border-white/10 p-4 font-display text-lg">Obavijesti</Link>
