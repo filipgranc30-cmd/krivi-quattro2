@@ -1,6 +1,8 @@
 import { CLUB_NAME, DEFAULT_TRAINING_TIME, HOME_VENUE } from "./club";
-import type { Db, OpponentScout, RosterPlayer, Settings } from "./types";
-import { uid } from "./util";
+import type { Db, RosterPlayer, Settings } from "./types";
+import { normName, uid } from "./util";
+
+export const DEFAULT_TRAINING_PLAYER = "Karlo Sedmak";
 
 export function defaultSettings(): Settings {
   return {
@@ -23,35 +25,33 @@ export function seedRoster(): RosterPlayer[] {
     "Ivan Jelinčić",
     "Danijel Jelinčić",
     "Zvonimir Soltar",
+    DEFAULT_TRAINING_PLAYER,
   ];
-  const demo: RosterPlayer[] = [
-    { id: uid(), name: "Marko Horvat", nickname: "The Butcher", average: 31.47, demo: true },
-    { id: uid(), name: "Ivan Kovač", nickname: "Ice", average: 29.81, demo: true },
-    { id: uid(), name: "Luka Perić", nickname: "Silent", average: 28.66, demo: true },
-    { id: uid(), name: "Matej Matić", nickname: "Mace", average: 27.35, demo: true },
-    { id: uid(), name: "Tomislav Sertić", nickname: "Toti", average: 26.18, demo: true },
-    { id: uid(), name: "Dario Jurić", nickname: "Daro", average: 25.42, demo: true },
-  ];
-  return [
-    ...real.map((name) => ({ id: uid(), name, nickname: "", average: null, demo: false })),
-    ...demo,
-  ];
+  return real.map((name) => ({ id: uid(), name, nickname: "", average: null, demo: false }));
 }
 
-export function seedScouts(): OpponentScout[] {
-  return [
-    {
-      club: "BULL BUZIN",
-      demo: true,
-      players: [
-        { name: "Ante Horvat", nickname: "Bull", average: 29.4 },
-        { name: "Petar Babić", nickname: "Pika", average: 27.15 },
-        { name: "Ivan Novak", nickname: "Nova", average: 25.8 },
-        { name: "Luka Barić", nickname: "Lux", average: 24.22 },
-        { name: "Mario Kovač", nickname: "Make", average: 22.9 },
-      ],
-    },
-  ];
+export function stripDemoData(db: Db): { db: Db; changed: boolean } {
+  const demoNames = new Set(db.roster.filter((player) => player.demo).map((player) => normName(player.name)));
+  const roster = db.roster.filter((player) => !player.demo);
+  const hasKarlo = roster.some((player) => normName(player.name) === normName(DEFAULT_TRAINING_PLAYER));
+  if (!hasKarlo) {
+    roster.push({ id: uid(), name: DEFAULT_TRAINING_PLAYER, nickname: "", average: null, demo: false });
+  }
+  const opponentScouts = db.opponentScouts.filter((scout) => !scout.demo);
+  const games = db.games
+    .map((game) => ({
+      ...game,
+      players: game.players.filter((player) => !demoNames.has(normName(player.name))),
+    }))
+    .filter((game) => game.players.length > 0);
+  const changed =
+    roster.length !== db.roster.length ||
+    !hasKarlo ||
+    opponentScouts.length !== db.opponentScouts.length ||
+    games.length !== db.games.length ||
+    games.some((game, index) => game.players.length !== db.games[index]?.players.length);
+  if (!changed) return { db, changed: false };
+  return { db: { ...db, roster, opponentScouts, games }, changed: true };
 }
 
 export function emptyDb(): Db {
@@ -62,7 +62,7 @@ export function emptyDb(): Db {
     notifications: [],
     manualFixtures: [],
     roster: seedRoster(),
-    opponentScouts: seedScouts(),
+    opponentScouts: [],
     games: [],
     settings: defaultSettings(),
     pushSubs: [],

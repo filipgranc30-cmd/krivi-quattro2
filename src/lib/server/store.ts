@@ -1,4 +1,4 @@
-import { emptyDb } from "../shared/seed";
+import { emptyDb, stripDemoData } from "../shared/seed";
 import type { Db } from "../shared/types";
 import { uid } from "../shared/util";
 import { redis } from "./redis";
@@ -10,16 +10,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function readDb(): Promise<Db> {
+async function loadRaw(): Promise<{ db: Db; changed: boolean }> {
   const raw = await redis(["GET", KEY]);
-  if (typeof raw !== "string" || !raw) return emptyDb();
+  if (typeof raw !== "string" || !raw) return stripDemoData(emptyDb());
   try {
     const parsed = JSON.parse(raw) as Db;
-    if (!parsed || !Array.isArray(parsed.users)) return emptyDb();
-    return { ...emptyDb(), ...parsed };
+    if (!parsed || !Array.isArray(parsed.users)) return stripDemoData(emptyDb());
+    return stripDemoData({ ...emptyDb(), ...parsed });
   } catch {
-    return emptyDb();
+    return stripDemoData(emptyDb());
   }
+}
+
+export async function readDb(): Promise<Db> {
+  const loaded = await loadRaw();
+  if (loaded.changed) {
+    try {
+      await updateDb(() => loaded.db);
+    } catch {
+      // The cleaned copy is still returned. The next write persists it.
+    }
+  }
+  return loaded.db;
 }
 
 async function writeDb(db: Db) {
@@ -36,7 +48,7 @@ export async function updateDb(mutator: (db: Db) => Db | Promise<Db>): Promise<D
       continue;
     }
     try {
-      const current = await readDb();
+      const current = (await loadRaw()).db;
       const next = await mutator(current);
       await writeDb(next);
       return next;

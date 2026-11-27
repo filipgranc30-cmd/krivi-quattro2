@@ -1,5 +1,5 @@
 import { applyAction, publicUser, toPublic } from "../shared/mutate";
-import { emptyDb } from "../shared/seed";
+import { emptyDb, stripDemoData } from "../shared/seed";
 import type { Action, AppData, Db, UserPublic } from "../shared/types";
 import { uid } from "../shared/util";
 
@@ -13,7 +13,10 @@ function read(): Db {
     if (!raw) return emptyDb();
     const parsed = JSON.parse(raw) as Db;
     if (!parsed || !Array.isArray(parsed.users)) return emptyDb();
-    return { ...emptyDb(), ...parsed, settings: { ...emptyDb().settings, ...parsed.settings } };
+    const merged = { ...emptyDb(), ...parsed, settings: { ...emptyDb().settings, ...parsed.settings } };
+    const cleaned = stripDemoData(merged);
+    if (cleaned.changed) write(cleaned.db);
+    return cleaned.db;
   } catch {
     return emptyDb();
   }

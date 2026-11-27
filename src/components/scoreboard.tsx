@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { suggestCheckout } from "@/lib/shared/checkout";
+import { createMarathon, MARATHON_ROUNDS, MARATHON_TARGETS, marathonWinner, throwMarathonDart, type MarathonState } from "@/lib/shared/marathon";
+import { DEFAULT_TRAINING_PLAYER } from "@/lib/shared/seed";
 import type { AppData, GamePlayerResult, SavedGame } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
@@ -14,36 +16,39 @@ type GameType = SavedGame["type"];
 export function GameScreen({ type }: { type: GameType }) {
   const { data, user } = useApp();
   const people = useMemo(() => candidates(data, user?.id, user?.name), [data, user]);
-  const [picked, setPicked] = useState<string[]>(user ? [user.id] : []);
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const selection = picked ?? defaultTrainingPick(people, user?.id);
   const [started, setStarted] = useState(false);
   const [legsToWin, setLegsToWin] = useState(2);
   const [setsToWin, setSetsToWin] = useState(1);
   const [rounds, setRounds] = useState(type === "marathon" ? 10 : 8);
-  const selected = people.filter((person) => picked.includes(person.key));
+  const selected = people.filter((person) => selection.includes(person.key));
 
   if (!started) {
     return (
       <div className="space-y-4">
         <div>
           <SectionTitle>{titleOf(type)}</SectionTitle>
-          <p className="mt-1 text-sm text-zinc-400">Odaberi tko igra. Redoslijed je red bacanja.</p>
+          <p className="mt-1 text-sm text-zinc-400">
+            {type === "marathon"
+              ? "20 rundi po 3 strelice. Meta ide Bull, D20, D19 … D1. Pogodak odmah prebacuje na sljedeću metu. Igra staje nakon 20 rundi ili kad netko pogodi D1."
+              : "Odaberi tko igra. Redoslijed je red bacanja."}
+          </p>
         </div>
         <div className="space-y-2">
           {people.map((person) => {
-            const on = picked.includes(person.key);
+            const on = selection.includes(person.key);
             return (
               <button
                 key={person.key}
                 type="button"
                 onClick={() =>
-                  setPicked((current) => (current.includes(person.key) ? current.filter((id) => id !== person.key) : [...current, person.key]))
+                  setPicked(selection.includes(person.key) ? selection.filter((id) => id !== person.key) : [...selection, person.key])
                 }
                 className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${on ? "border-orange-500 bg-orange-500/10" : "border-white/10"}`}
               >
-                <span>
-                  {person.name} {person.demo ? <em className="text-xs text-zinc-500">demo</em> : null}
-                </span>
-                <span className="text-xs text-zinc-400">{on ? `${picked.indexOf(person.key) + 1}.` : "Dodaj"}</span>
+                <span>{person.name}</span>
+                <span className="text-xs text-zinc-400">{on ? `${selection.indexOf(person.key) + 1}.` : "Dodaj"}</span>
               </button>
             );
           })}
@@ -54,7 +59,7 @@ export function GameScreen({ type }: { type: GameType }) {
             <Stepper label="Setovi" value={setsToWin} min={1} max={3} onChange={setSetsToWin} />
           </Card>
         )}
-        {(type === "marathon" || type === "highscore") && (
+        {type === "highscore" && (
           <Card>
             <Stepper label="Runde" value={rounds} min={5} max={20} onChange={setRounds} />
           </Card>
@@ -68,7 +73,8 @@ export function GameScreen({ type }: { type: GameType }) {
 
   if (type === "501") return <Game501 players={selected} legsToWin={legsToWin} setsToWin={setsToWin} />;
   if (type === "cricket") return <GameCricket players={selected} />;
-  return <GameTotals type={type} players={selected} rounds={rounds} />;
+  if (type === "marathon") return <GameMarathon players={selected} />;
+  return <GameTotals type="highscore" players={selected} rounds={rounds} />;
 }
 
 function candidates(data: AppData, userId?: string, userName?: string): Person[] {
@@ -82,8 +88,21 @@ function candidates(data: AppData, userId?: string, userName?: string): Person[]
   };
   for (const member of data.members) add({ key: member.id, name: member.name, userId: member.id });
   if (userId && userName) add({ key: userId, name: userName, userId });
-  for (const player of data.roster) add({ key: player.id, name: player.name, demo: player.demo });
+  for (const player of data.roster) {
+    if (player.demo) continue;
+    add({ key: player.id, name: player.name });
+  }
+  add({ key: "karlo-sedmak", name: DEFAULT_TRAINING_PLAYER });
   return list;
+}
+
+function defaultTrainingPick(people: Person[], userId?: string): string[] {
+  const ids: string[] = [];
+  const karlo = people.find((person) => normName(person.name) === normName(DEFAULT_TRAINING_PLAYER));
+  if (karlo) ids.push(karlo.key);
+  const me = userId ? people.find((person) => person.userId === userId || person.key === userId) : undefined;
+  if (me && !ids.includes(me.key)) ids.push(me.key);
+  return ids;
 }
 
 function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
@@ -509,7 +528,92 @@ function GameCricket({ players }: { players: Person[] }) {
   );
 }
 
-function GameTotals({ type, players, rounds }: { type: "marathon" | "highscore"; players: Person[]; rounds: number }) {
+function GameMarathon({ players }: { players: Person[] }) {
+  const [state, setState] = useState<MarathonState>(() => createMarathon(players));
+  const [history, setHistory] = useState<MarathonState[]>([]);
+  const current = state.players[state.turn];
+  const target = current ? MARATHON_TARGETS[current.target] : MARATHON_TARGETS[0];
+  const winnerIndex = state.over ? marathonWinner(state) : null;
+
+  const throwDart = (hit: boolean) => {
+    if (state.over) return;
+    setHistory((items) => [...items.slice(-40), state]);
+    setState(throwMarathonDart(state, hit));
+  };
+
+  const undo = () => {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setState(previous);
+    setHistory((items) => items.slice(0, -1));
+  };
+
+  const results: GamePlayerResult[] = state.players.map((player, index) => ({
+    name: player.name,
+    userId: player.userId,
+    won: winnerIndex === index,
+    totalScore: player.hits,
+    marathonPoints: player.points,
+    threeDartAvg: player.rounds ? round1(player.points / player.rounds) : 0,
+    highestVisit: player.bestRound,
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <SectionTitle>MARATON</SectionTitle>
+          <p className="text-xs text-zinc-400">Bull, zatim D20 do D1. Pogodak = 1, bull vrijedi 50, duplo je dvostruki broj.</p>
+        </div>
+        <GhostButton onClick={undo}>Poništi</GhostButton>
+      </div>
+      {state.players.map((player, index) => (
+        <div key={player.key} className={`rounded-xl border p-3 ${!state.over && index === state.turn ? "border-orange-500" : "border-white/10"}`}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-semibold">{player.name}</span>
+            <span className="text-xs text-zinc-400">{player.finished ? "D1" : MARATHON_TARGETS[player.target].label}</span>
+          </div>
+          <div className="mt-1 flex justify-between text-sm">
+            <span>Pogoci <span className="font-display text-2xl text-orange-300">{player.hits}</span></span>
+            <span className="text-zinc-400">{player.points} bod · {player.rounds}/{MARATHON_ROUNDS}</span>
+          </div>
+        </div>
+      ))}
+      {!state.over && current && (
+        <Card>
+          <div className="flex items-center justify-between text-sm text-orange-300">
+            <span>{current.name}</span>
+            <span>Runda {current.rounds + 1}/{MARATHON_ROUNDS} · strelica {state.dart + 1}/3</span>
+          </div>
+          <div className="mt-2 text-center text-xs tracking-[0.2em] text-zinc-500">TRENUTNA META</div>
+          <div className="font-display text-center text-7xl leading-none text-orange-400">{target.label}</div>
+          <div className="mt-1 text-center text-sm text-zinc-300">{target.points} bodova ako pogodiš</div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button type="button" className="h-20 rounded-2xl bg-orange-500 text-xl font-bold text-black" onClick={() => throwDart(true)}>
+              Pogodak
+            </button>
+            <button type="button" className="h-20 rounded-2xl border border-white/20 text-xl font-bold" onClick={() => throwDart(false)}>
+              Promašaj
+            </button>
+          </div>
+        </Card>
+      )}
+      {state.over && winnerIndex != null && (
+        <ResultBox
+          type="marathon"
+          summary={
+            state.players[winnerIndex].finished
+              ? `${state.players[winnerIndex].name} pogađa D1 · ${state.players[winnerIndex].hits} pogodaka`
+              : `${state.players[winnerIndex].name} ima najviše pogodaka (${state.players[winnerIndex].hits})`
+          }
+          players={results}
+        />
+      )}
+    </div>
+  );
+}
+
+function GameTotals({ type, players, rounds }: { type: "highscore"; players: Person[]; rounds: number }) {
   type P = { key: string; name: string; userId?: string; total: number; roundsDone: number; highest: number; c180: number; c140: number; c100: number };
   const [list, setList] = useState<P[]>(() => players.map((person) => ({ key: person.key, name: person.name, userId: person.userId, total: 0, roundsDone: 0, highest: 0, c180: 0, c140: 0, c100: 0 })));
   const [turn, setTurn] = useState(0);
@@ -609,9 +713,9 @@ function ResultBox({ type, summary, players }: { type: GameType; summary: string
           <li key={player.name} className="flex justify-between gap-3">
             <span>{player.won ? "★ " : ""}{player.name}</span>
             <span className="text-orange-300">
-              {player.threeDartAvg != null ? `prosjek ${player.threeDartAvg}` : ""}
-              {player.cricketMpr != null ? `MPR ${player.cricketMpr}` : ""}
-              {player.totalScore != null && type !== "501" ? ` · ${player.totalScore}` : ""}
+              {type === "marathon"
+                ? `${player.totalScore ?? 0} pogodaka${player.marathonPoints != null ? ` · ${player.marathonPoints} bod` : ""}`
+                : `${player.threeDartAvg != null ? `prosjek ${player.threeDartAvg}` : ""}${player.cricketMpr != null ? `MPR ${player.cricketMpr}` : ""}${player.totalScore != null && type !== "501" ? ` · ${player.totalScore}` : ""}`}
             </span>
           </li>
         ))}
