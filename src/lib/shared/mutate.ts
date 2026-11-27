@@ -306,7 +306,8 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
     case "dailyDeleteMatch":
     case "dailySetStats":
     case "dailySetPicks":
-    case "dailySetScoring": {
+    case "dailySetScoring":
+    case "dailySetTournament": {
       const result = applyDailyAction(next.dailyDarts, actor, action, actor.role === "admin");
       if (result.error) return { db, error: result.error };
       next.dailyDarts = result.state;
