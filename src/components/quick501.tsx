@@ -22,7 +22,7 @@ export function Quick501({ people, userId, onDetailed }: { people: Person[]; use
   const initial = useMemo(() => defaultPair(people, userId), [people, userId]);
   const [picked, setPicked] = useState<string[]>(initial);
   const [starterKey, setStarterKey] = useState(initial[0] ?? "");
-  const [bestOf, setBestOf] = useState(1);
+  const [bestOf, setBestOf] = useState(3);
   const [started, setStarted] = useState(false);
   const players = people.filter((person) => picked.includes(person.key)).slice(0, 2);
   const starter = players.some((person) => person.key === starterKey) ? starterKey : players[0]?.key ?? "";
