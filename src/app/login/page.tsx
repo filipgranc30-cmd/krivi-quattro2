@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Field, PrimaryButton } from "@/components/ui";
@@ -55,6 +56,9 @@ export default function LoginPage() {
       <p className="mt-6 text-center text-xs leading-relaxed text-zinc-500">
         Prvi račun i ADMIN_EMAIL postaju admin odmah. Svi ostali čekaju da admin odobri pristup.
       </p>
+      <Link href="/preuzmi" className="mt-4 block text-center text-sm font-semibold text-orange-300">
+        Preuzmi Android aplikaciju
+      </Link>
     </div>
   );
 }

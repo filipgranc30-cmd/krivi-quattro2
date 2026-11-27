@@ -48,7 +48,9 @@ export default function MorePage() {
           <li>Izbornik (tri točkice) → Instaliraj aplikaciju ili Dodaj na početni zaslon.</li>
           <li>Ikona Krivi Quattro ostaje na početnom zaslonu i otvara se kao aplikacija.</li>
         </ol>
-        <p className="mt-2 text-xs text-zinc-500">APK se može preuzeti iz GitHub Actions artefakta „Android APK” nakon što workflow prođe. To je omot koji otvara ovu stranicu.</p>
+        <Link href="/preuzmi" className="mt-3 block text-sm font-semibold text-orange-300">
+          Preuzmi APK bez GitHub računa
+        </Link>
       </Card>
       {admin && (
         <Card>
