@@ -71,6 +71,20 @@ if (fs.existsSync("capacitor.config.ts")) {
 JS
 npx cap sync android
 
+python3 "$ROOT/scripts/android-icons.py" "$work/android/app/src/main/res" "$ROOT/public/icons/icon-512.png"
+
+gradle_file="$work/android/app/build.gradle"
+python3 - "$gradle_file" << 'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+text2 = text.replace("versionCode 1", "versionCode 2", 1).replace('versionName "1.0"', 'versionName "1.1.0"', 1)
+if 'versionCode 2' not in text2 or 'versionName "1.1.0"' not in text2:
+    raise SystemExit("Could not set versionCode 2 / versionName 1.1.0 in " + str(path))
+path.write_text(text2)
+print(path)
+PY
+
 cd android
 chmod +x ./gradlew
 ./gradlew assembleRelease --no-daemon
