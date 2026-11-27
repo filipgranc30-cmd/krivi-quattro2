@@ -296,12 +296,17 @@ function Gate({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const pending = user?.status === "pending";
+  const downloadPage = path === "/preuzmi";
   useEffect(() => {
     if (!ready) return;
-    if (!user && path !== "/login") router.replace("/login");
+    if (!user && path !== "/login" && path !== "/preuzmi") router.replace("/login");
     if (user && !pending && (path === "/login" || path === "/")) router.replace("/dashboard");
   }, [path, pending, ready, router, user]);
 
+  if (downloadPage) {
+    if (user && !pending) return <Shell>{children}</Shell>;
+    return children;
+  }
   if (pending) return <PendingScreen />;
   if (!ready || (!user && path !== "/login") || (user && (path === "/login" || path === "/"))) {
     return <Splash />;
@@ -319,7 +324,10 @@ function PendingScreen() {
       <p className="mt-3 text-sm leading-relaxed text-zinc-300">
         {user?.name}, račun je spremljen, ali još nemaš pristup rasporedu ni treninzima. Admin treba odobriti zahtjev.
       </p>
-      <button type="button" className="mt-6 h-12 rounded-xl border border-white/15 px-5" onClick={() => logout()}>
+      <a href="/preuzmi" className="mt-6 text-sm text-orange-300">
+        Preuzmi Android aplikaciju
+      </a>
+      <button type="button" className="mt-4 h-12 rounded-xl border border-white/15 px-5" onClick={() => logout()}>
         Odjava
       </button>
     </div>
