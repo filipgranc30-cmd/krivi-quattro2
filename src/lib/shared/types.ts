@@ -100,6 +100,18 @@ export type GamePlayerResult = {
   totalScore?: number;
   /** Marathon only: total points (bull 50, double × 2). Hits stay in totalScore. */
   marathonPoints?: number;
+  /** 501: legs won in this match. */
+  legsWon?: number;
+  /** 501: legs contested in this match. */
+  legsPlayed?: number;
+  /** 501: darts thrown in this match. */
+  dartsThrown?: number;
+  /** 501: points scored. A won leg is 501; a lost leg is 501 minus the remaining score. */
+  pointsScored?: number;
+  /** 501: fewest darts in a leg this player won. */
+  bestLegDarts?: number;
+  /** 501: checkout of the best leg, for example "5. ruka, 3. strelica". */
+  checkout?: string;
 };
 
 export type SavedGame = {

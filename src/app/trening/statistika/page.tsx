@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useApp } from "@/components/app-provider";
 import { Card, SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
+import { aggregate501 } from "@/lib/shared/quick501";
 
 export default function TrainingStatsPage() {
   const { data } = useApp();
@@ -32,10 +33,25 @@ export default function TrainingStatsPage() {
     }
     return [...map.values()].sort((a, b) => b.wins - a.wins || b.avgSum / Math.max(1, b.avgN) - a.avgSum / Math.max(1, a.avgN));
   }, [data.games]);
+  const fiveOhOne = useMemo(() => aggregate501(data.games), [data.games]);
 
   return (
     <div className="space-y-4">
       <Link href="/trening" className="text-sm text-orange-300">← Trening</Link>
+      <SectionTitle>501 DO</SectionTitle>
+      <p className="text-sm text-zinc-400">Utakmice, pobjede, prosjek, najbolji leg i strelice po legu.</p>
+      {fiveOhOne.map((row) => (
+        <Card key={row.name}>
+          <div className="flex justify-between gap-3">
+            <div className="font-display text-xl">{row.name}</div>
+            <div className="text-sm text-zinc-400">{row.wins}/{row.matches} pobjeda</div>
+          </div>
+          <div className="mt-1 text-xs text-zinc-400">
+            prosjek {row.average != null ? row.average.toFixed(1) : "—"} · najbolji leg {row.bestLegDarts ? `${row.bestLegDarts} strelica` : "—"} · strelice po legu {row.dartsPerLeg != null ? row.dartsPerLeg.toFixed(1) : "—"}
+          </div>
+        </Card>
+      ))}
+      {!fiveOhOne.length && <p className="text-sm text-zinc-400">Još nema spremljenog 501 DO.</p>}
       <SectionTitle>STATISTIKA TRENINGA</SectionTitle>
       {board.map((row) => (
         <Card key={row.name}>

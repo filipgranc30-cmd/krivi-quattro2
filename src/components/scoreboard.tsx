@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { suggestCheckout } from "@/lib/shared/checkout";
 import { createMarathon, MARATHON_ROUNDS, MARATHON_TARGETS, marathonWinner, throwMarathonDart, type MarathonState } from "@/lib/shared/marathon";
+import { checkoutLabel } from "@/lib/shared/quick501";
 import { DEFAULT_TRAINING_PLAYER } from "@/lib/shared/seed";
 import type { AppData, GamePlayerResult, SavedGame } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
+import { Quick501 } from "./quick501";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "./ui";
 
 type Person = { key: string; name: string; userId?: string; demo?: boolean };
@@ -19,10 +21,15 @@ export function GameScreen({ type }: { type: GameType }) {
   const [picked, setPicked] = useState<string[] | null>(null);
   const selection = picked ?? defaultTrainingPick(people, user?.id);
   const [started, setStarted] = useState(false);
+  const [mode501, setMode501] = useState<"quick" | "detail">("quick");
   const [legsToWin, setLegsToWin] = useState(2);
   const [setsToWin, setSetsToWin] = useState(1);
   const [rounds, setRounds] = useState(type === "marathon" ? 10 : 8);
   const selected = people.filter((person) => selection.includes(person.key));
+
+  if (type === "501" && mode501 === "quick") {
+    return <Quick501 people={people} userId={user?.id} onDetailed={() => setMode501("detail")} />;
+  }
 
   if (!started) {
     return (
@@ -32,7 +39,9 @@ export function GameScreen({ type }: { type: GameType }) {
           <p className="mt-1 text-sm text-zinc-400">
             {type === "marathon"
               ? "20 rundi po 3 strelice. Meta ide Bull, D20, D19 … D1. Pogodak odmah prebacuje na sljedeću metu. Igra staje nakon 20 rundi ili kad netko pogodi D1."
-              : "Odaberi tko igra. Redoslijed je red bacanja."}
+              : type === "501"
+                ? "Detaljno bodovanje. Odaberi tko igra. Redoslijed je red bacanja."
+                : "Odaberi tko igra. Redoslijed je red bacanja."}
           </p>
         </div>
         <div className="space-y-2">
@@ -67,6 +76,11 @@ export function GameScreen({ type }: { type: GameType }) {
         <PrimaryButton className="w-full" disabled={!selected.length} onClick={() => setStarted(true)}>
           Kreni
         </PrimaryButton>
+        {type === "501" && (
+          <button type="button" className="w-full text-center text-sm text-orange-300 underline" onClick={() => setMode501("quick")}>
+            Brzi unos
+          </button>
+        )}
       </div>
     );
   }
@@ -133,6 +147,8 @@ type P501 = {
   attempts: number;
   checkouts: number;
   best: number;
+  legsWon: number;
+  bestLegDarts: number;
   c180: number;
   c140: number;
   c100: number;
@@ -156,6 +172,8 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
       attempts: 0,
       checkouts: 0,
       best: 0,
+      legsWon: 0,
+      bestLegDarts: 0,
       c180: 0,
       c140: 0,
       c100: 0,
@@ -223,6 +241,8 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
       player.checkouts += 1;
       player.best = Math.max(player.best, start);
       player.legs += 1;
+      player.legsWon += 1;
+      if (!player.bestLegDarts || player.legDarts < player.bestLegDarts) player.bestLegDarts = player.legDarts;
       let done: number | null = null;
       if (setsToWin <= 1) {
         if (player.legs >= legsToWin) done = turn;
@@ -286,6 +306,7 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
     else setVisit(scores);
   };
 
+  const legsPlayed = list.reduce((sum, player) => sum + player.legsWon, 0);
   const results: GamePlayerResult[] = list.map((player, index) => ({
     name: player.name,
     userId: player.userId,
@@ -298,6 +319,14 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
     count140: player.c140,
     count100: player.c100,
     bestCheckout: player.best || undefined,
+    legsWon: player.legsWon,
+    legsPlayed,
+    dartsThrown: player.darts,
+    pointsScored: player.scored,
+    bestLegDarts: player.bestLegDarts || undefined,
+    checkout: player.bestLegDarts
+      ? checkoutLabel(Math.ceil(player.bestLegDarts / 3), ((player.bestLegDarts - 1) % 3) + 1)
+      : undefined,
   }));
 
   return (
@@ -715,7 +744,9 @@ function ResultBox({ type, summary, players }: { type: GameType; summary: string
             <span className="text-orange-300">
               {type === "marathon"
                 ? `${player.totalScore ?? 0} pogodaka${player.marathonPoints != null ? ` · ${player.marathonPoints} bod` : ""}`
-                : `${player.threeDartAvg != null ? `prosjek ${player.threeDartAvg}` : ""}${player.cricketMpr != null ? `MPR ${player.cricketMpr}` : ""}${player.totalScore != null && type !== "501" ? ` · ${player.totalScore}` : ""}`}
+                : type === "501"
+                  ? `prosjek ${player.threeDartAvg ?? 0}${player.legsWon != null ? ` · legovi ${player.legsWon}` : ""}${player.bestLegDarts ? ` · najbolji leg ${player.bestLegDarts}` : ""}${player.checkout ? ` · ${player.checkout}` : ""}`
+                  : `${player.threeDartAvg != null ? `prosjek ${player.threeDartAvg}` : ""}${player.cricketMpr != null ? `MPR ${player.cricketMpr}` : ""}${player.totalScore != null ? ` · ${player.totalScore}` : ""}`}
             </span>
           </li>
         ))}
