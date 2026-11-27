@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
@@ -117,6 +118,8 @@ export default function DashboardPage() {
           {!snapshot?.ourPlayers.length && <li className="text-sm text-zinc-500">Ligaški popis još nije učitan.</li>}
         </ol>
       </Card>
+
+      <TurniriTeaser />
 
       <div className="grid grid-cols-2 gap-3">
         {TILES.map((tile) => (
