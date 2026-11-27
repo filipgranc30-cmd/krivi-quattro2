@@ -2,6 +2,7 @@ name: Android APK
 
 on:
   workflow_dispatch:
+  pull_request:
   push:
     branches: [main]
 
@@ -17,7 +18,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # The legacy "tools" package was removed from the SDK. This action's
+      # default is `sdkmanager tools`, which now exits with
+      # "Failed to find package 'tools'". Ask only for platform-tools;
+      # cmdline-tools are already on the GitHub runner.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
