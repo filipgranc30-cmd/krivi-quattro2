@@ -8,7 +8,7 @@ import { addDays, formatDateHr, mondayOf, todayZagreb, weekdayName } from "@/lib
 import type { AttendanceStatus } from "@/lib/shared/types";
 
 const GAMES = [
-  { href: "/trening/igra/501", title: "501 DO", text: "Double out, checkout, prosjek" },
+  { href: "/trening/igra/501", title: "501 DO", text: "Brzi unos rezultata" },
   { href: "/trening/igra/cricket", title: "Cricket", text: "15–20 i bull" },
   { href: "/trening/igra/marathon", title: "Maraton", text: "20 rundi, Bull pa D20 do D1" },
   { href: "/trening/igra/highscore", title: "High score", text: "Najveći zbroj pobjeđuje" },
