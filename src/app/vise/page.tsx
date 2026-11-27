@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Card, Field, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
+import { formatWhen } from "@/lib/shared/dates";
 
 export default function MorePage() {
   const { user, data, mode, logout, act, enablePush, pushEnabled, resetLocal, snapshot } = useApp();
@@ -49,6 +50,25 @@ export default function MorePage() {
         </ol>
         <p className="mt-2 text-xs text-zinc-500">APK se može preuzeti iz GitHub Actions artefakta „Android APK” nakon što workflow prođe. To je omot koji otvara ovu stranicu.</p>
       </Card>
+      {admin && (
+        <Card>
+          <h2 className="font-display text-lg">Zahtjevi za pristup</h2>
+          {data.pendingRequests.length === 0 && <p className="mt-2 text-sm text-zinc-400">Nema novih zahtjeva.</p>}
+          <ul className="mt-3 space-y-3">
+            {data.pendingRequests.map((request) => (
+              <li key={request.id} className="rounded-xl border border-white/10 p-3 text-sm">
+                <div className="font-semibold">{request.name}</div>
+                <div className="text-zinc-400">{request.email}</div>
+                <div className="text-xs text-zinc-500">{formatWhen(request.createdAt).label}</div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <PrimaryButton onClick={() => act({ op: "approveUser", userId: request.id })}>Odobri</PrimaryButton>
+                  <GhostButton onClick={() => act({ op: "rejectUser", userId: request.id })}>Odbij</GhostButton>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {admin && (
         <Card>
           <h2 className="font-display text-lg">Članovi</h2>

@@ -9,7 +9,12 @@ export function pushConfigured(): boolean {
   return Boolean(vapidPublicKey() && process.env.VAPID_PRIVATE_KEY);
 }
 
-export async function sendPush(db: Db, actorId: string, payload: { title: string; body: string; url: string }) {
+export async function sendPush(
+  db: Db,
+  actorId: string,
+  payload: { title: string; body: string; url: string },
+  onlyUserIds?: string[],
+) {
   if (!pushConfigured()) return;
   const publicKey = vapidPublicKey();
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -20,7 +25,7 @@ export async function sendPush(db: Db, actorId: string, payload: { title: string
   } catch {
     return;
   }
-  const targets = db.pushSubs.filter((sub) => sub.userId !== actorId);
+  const targets = db.pushSubs.filter((sub) => sub.userId !== actorId && (!onlyUserIds || onlyUserIds.includes(sub.userId)));
   await Promise.all(
     targets.map(async (sub) => {
       try {

@@ -1,30 +1,18 @@
-import type { Action, AppData, Db, Member, NotificationItem, UserPublic } from "./types";
+import type { Action, AppData, Db, Member, NotificationItem, StoredUser, UserPublic } from "./types";
+import { accountStatus } from "./types";
 import { clampText, firstName, normName, uid } from "./util";
 
 export type MutateResult = {
   db: Db;
   error?: string;
-  push?: { title: string; body: string; url: string };
+  push?: { title: string; body: string; url: string; userIds?: string[] };
 };
 
 function requireAdmin(actor: UserPublic): string | null {
   return actor.role === "admin" ? null : "Samo trener ili admin može mijenjati ove podatke.";
 }
 
-function notifyOthers(db: Db, actor: UserPublic, title: string, body: string, href: string) {
-  const now = new Date().toISOString();
-  for (const user of db.users) {
-    if (user.id === actor.id) continue;
-    db.notifications.push({
-      id: uid(),
-      userId: user.id,
-      title,
-      body,
-      href,
-      createdAt: now,
-      read: false,
-    });
-  }
+function trimNotifications(db: Db) {
   const grouped = new Map<string, NotificationItem[]>();
   for (const item of db.notifications) {
     const list = grouped.get(item.userId) ?? [];
@@ -36,11 +24,64 @@ function notifyOthers(db: Db, actor: UserPublic, title: string, body: string, hr
   db.notifications = next;
 }
 
+function notifyUsers(db: Db, userIds: string[], title: string, body: string, href: string) {
+  const now = new Date().toISOString();
+  const allow = new Set(userIds);
+  for (const userId of allow) {
+    db.notifications.push({ id: uid(), userId, title, body, href, createdAt: now, read: false });
+  }
+  trimNotifications(db);
+}
+
+function notifyOthers(db: Db, actor: UserPublic, title: string, body: string, href: string) {
+  notifyUsers(
+    db,
+    db.users.filter((user) => user.id !== actor.id && accountStatus(user) === "active").map((user) => user.id),
+    title,
+    body,
+    href,
+  );
+}
+
+export function notifyAdmins(db: Db, title: string, body: string, href: string) {
+  notifyUsers(
+    db,
+    db.users.filter((user) => user.role === "admin" && accountStatus(user) === "active").map((user) => user.id),
+    title,
+    body,
+    href,
+  );
+}
+
+export function registerAccount(
+  db: Db,
+  input: { id: string; email: string; name: string; passwordHash: string; adminEmail: string | null },
+): StoredUser {
+  const autoAdmin = db.users.length === 0 || Boolean(input.adminEmail && input.email === input.adminEmail);
+  const user: StoredUser = {
+    id: input.id,
+    email: input.email,
+    name: input.name,
+    role: autoAdmin ? "admin" : "member",
+    status: autoAdmin ? "active" : "pending",
+    createdAt: new Date().toISOString(),
+    passwordHash: input.passwordHash,
+  };
+  db.users.push(user);
+  if (user.status === "pending") {
+    notifyAdmins(db, "Registracija", `Novi zahtjev za registraciju: ${user.name}`, "/vise");
+  }
+  return user;
+}
+
 function adminCount(db: Db): number {
   return db.users.filter((user) => user.role === "admin").length;
 }
 
 export function applyAction(db: Db, actor: UserPublic, action: Action): MutateResult {
+  if (accountStatus(actor) === "pending") {
+    return { db, error: "Čeka odobrenje admina." };
+  }
   const next: Db = {
     ...db,
     users: db.users.map((user) => ({ ...user })),
@@ -228,11 +269,35 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       if (denied) return { db, error: denied };
       const user = next.users.find((item) => item.id === action.userId);
       if (!user) return { db, error: "Član nije pronađen." };
+      if (accountStatus(user) === "pending") return { db, error: "Prvo odobri pristup." };
       if (action.role !== "admin" && action.role !== "member") return { db, error: "Nepoznata uloga." };
       if (user.role === "admin" && action.role !== "admin" && adminCount(next) <= 1) {
         return { db, error: "Mora ostati barem jedan admin." };
       }
       user.role = action.role;
+      return { db: next };
+    }
+    case "approveUser": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      const user = next.users.find((item) => item.id === action.userId);
+      if (!user || accountStatus(user) !== "pending") return { db, error: "Nema takvog zahtjeva." };
+      user.status = "active";
+      user.role = "member";
+      const body = "Tvoj zahtjev za pristup je odobren.";
+      notifyUsers(next, [user.id], "Pristup", body, "/dashboard");
+      return { db: next, push: { title: "Krivi Quattro", body, url: "/dashboard", userIds: [user.id] } };
+    }
+    case "rejectUser": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      const user = next.users.find((item) => item.id === action.userId);
+      if (!user || accountStatus(user) !== "pending") return { db, error: "Nema takvog zahtjeva." };
+      next.users = next.users.filter((item) => item.id !== user.id);
+      next.sessions = next.sessions.filter((item) => item.userId !== user.id);
+      next.pushSubs = next.pushSubs.filter((item) => item.userId !== user.id);
+      next.notifications = next.notifications.filter((item) => item.userId !== user.id);
+      next.attendance = next.attendance.filter((item) => item.userId !== user.id);
       return { db: next };
     }
     default:
@@ -300,16 +365,31 @@ function sanitizeSettings(input: import("./types").Settings): import("./types").
 }
 
 export function toPublic(db: Db, viewer: UserPublic | null): AppData {
-  const isAdmin = viewer?.role === "admin";
+  const isAdmin = viewer?.role === "admin" && accountStatus(viewer) === "active";
   const members: Member[] = db.users
+    .filter((user) => accountStatus(user) === "active")
     .map((user) => ({
       id: user.id,
       name: user.name,
       role: user.role,
+      status: "active" as const,
       createdAt: user.createdAt,
       email: isAdmin ? user.email : "",
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "hr"));
+  const pendingRequests: Member[] = isAdmin
+    ? db.users
+        .filter((user) => accountStatus(user) === "pending")
+        .map((user) => ({
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          status: "pending" as const,
+          createdAt: user.createdAt,
+          email: user.email,
+        }))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    : [];
   const notifications = viewer
     ? db.notifications
         .filter((item) => item.userId === viewer.id)
@@ -325,9 +405,17 @@ export function toPublic(db: Db, viewer: UserPublic | null): AppData {
     games: [...db.games].sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
     settings: db.settings,
     members,
+    pendingRequests,
   };
 }
 
-export function publicUser(user: { id: string; email: string; name: string; role: UserPublic["role"]; createdAt: string }): UserPublic {
-  return { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt };
+export function publicUser(user: { id: string; email: string; name: string; role: UserPublic["role"]; status?: UserPublic["status"] | null; createdAt: string }): UserPublic {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    status: accountStatus(user),
+    createdAt: user.createdAt,
+  };
 }

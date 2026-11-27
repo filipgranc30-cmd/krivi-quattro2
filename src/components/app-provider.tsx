@@ -8,7 +8,7 @@ import { emptyDb } from "@/lib/shared/seed";
 import type { Action, AppData, Snapshot, UserPublic } from "@/lib/shared/types";
 import { Shell } from "./shell";
 
-type Status = { mode: "shared" | "local"; push: boolean; vapidPublicKey: string | null };
+type Status = { mode: "shared" | "local"; push: boolean; vapidPublicKey: string | null; adminEmail: string | null };
 
 type AppContextValue = {
   ready: boolean;
@@ -38,7 +38,7 @@ async function readJson(response: Response) {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [status, setStatus] = useState<Status>({ mode: "local", push: false, vapidPublicKey: null });
+  const [status, setStatus] = useState<Status>({ mode: "local", push: false, vapidPublicKey: null, adminEmail: null });
   const [user, setUser] = useState<UserPublic | null>(null);
   const [data, setData] = useState<AppData>(emptyData);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -64,6 +64,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const body = await readJson(response);
+    if (body.pending && body.user) {
+      setUser(body.user as UserPublic);
+      setData(emptyData);
+      return;
+    }
     if (body.ok && body.user && body.data) {
       setUser(body.user as UserPublic);
       setData(body.data as AppData);
@@ -77,11 +82,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch("/api/status", { cache: "no-store" });
         const body = (await response.json()) as Status;
         if (cancelled) return;
-        const nextStatus = {
+        const nextStatus: Status = {
           mode: body.mode === "shared" ? "shared" : "local",
           push: Boolean(body.push),
           vapidPublicKey: body.vapidPublicKey ?? null,
-        } as Status;
+          adminEmail: typeof body.adminEmail === "string" ? body.adminEmail : null,
+        };
         setStatus(nextStatus);
         if (nextStatus.mode === "shared") await loadShared();
         else {
@@ -104,7 +110,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (status.mode === "shared") await loadShared();
-    else if (user) setData(localData(user));
+    else if (user) {
+      const session = localSessionUser();
+      if (!session) {
+        setUser(null);
+        setData(emptyData);
+      } else {
+        setUser(session);
+        setData(session.status === "pending" ? emptyData : localData(session));
+      }
+    }
+    if (user?.status === "pending") return;
     await loadSnapshot();
   }, [loadShared, loadSnapshot, status.mode, user]);
 
@@ -129,7 +145,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const result = await localLogin(email, password);
         if ("error" in result) return result.error;
         setUser(result.user);
-        setData(localData(result.user));
+        setData(result.user.status === "pending" ? emptyData : localData(result.user));
         return null;
       }
       const response = await fetch("/api/auth/login", {
@@ -149,10 +165,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(
     async (name: string, email: string, password: string) => {
       if (status.mode === "local") {
-        const result = await localRegister(name, email, password);
+        const result = await localRegister(name, email, password, status.adminEmail);
         if ("error" in result) return result.error;
         setUser(result.user);
-        setData(localData(result.user));
+        setData(result.user.status === "pending" ? emptyData : localData(result.user));
         return null;
       }
       const response = await fetch("/api/auth/register", {
@@ -166,7 +182,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await loadShared();
       return null;
     },
-    [loadShared, status.mode],
+    [loadShared, status.adminEmail, status.mode],
   );
 
   const logout = useCallback(async () => {
@@ -269,17 +285,35 @@ function Gate({ children }: { children: React.ReactNode }) {
   const { ready, user } = useApp();
   const path = usePathname();
   const router = useRouter();
+  const pending = user?.status === "pending";
   useEffect(() => {
     if (!ready) return;
     if (!user && path !== "/login") router.replace("/login");
-    if (user && (path === "/login" || path === "/")) router.replace("/dashboard");
-  }, [path, ready, router, user]);
+    if (user && !pending && (path === "/login" || path === "/")) router.replace("/dashboard");
+  }, [path, pending, ready, router, user]);
 
+  if (pending) return <PendingScreen />;
   if (!ready || (!user && path !== "/login") || (user && (path === "/login" || path === "/"))) {
     return <Splash />;
   }
   if (!user) return children;
   return <Shell>{children}</Shell>;
+}
+
+function PendingScreen() {
+  const { user, logout } = useApp();
+  return (
+    <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center bg-ink px-6 text-center">
+      <img src="/logo.jpg" alt="Krivi Quattro" className="h-28 w-28 rounded-full object-cover ring-2 ring-orange-500" />
+      <h1 className="font-display mt-6 text-3xl font-bold">Čeka odobrenje admina</h1>
+      <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+        {user?.name}, račun je spremljen, ali još nemaš pristup rasporedu ni treninzima. Admin treba odobriti zahtjev.
+      </p>
+      <button type="button" className="mt-6 h-12 rounded-xl border border-white/15 px-5" onClick={() => logout()}>
+        Odjava
+      </button>
+    </div>
+  );
 }
 
 function Splash() {

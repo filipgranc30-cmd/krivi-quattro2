@@ -1,4 +1,4 @@
-import { currentUser } from "@/lib/server/auth";
+import { currentUser, pendingBlock } from "@/lib/server/auth";
 import { isSharedMode } from "@/lib/server/redis";
 import { updateDb } from "@/lib/server/store";
 
@@ -9,6 +9,8 @@ export async function POST(request: Request) {
   if (!isSharedMode()) return Response.json({ ok: false }, { status: 409 });
   const user = await currentUser();
   if (!user) return Response.json({ ok: false }, { status: 401 });
+  const blocked = pendingBlock(user);
+  if (blocked) return blocked;
   const body = (await request.json().catch(() => null)) as {
     endpoint?: string;
     keys?: { p256dh?: string; auth?: string };
@@ -34,6 +36,8 @@ export async function DELETE(request: Request) {
   if (!isSharedMode()) return Response.json({ ok: true });
   const user = await currentUser();
   if (!user) return Response.json({ ok: false }, { status: 401 });
+  const blocked = pendingBlock(user);
+  if (blocked) return blocked;
   const body = (await request.json().catch(() => null)) as { endpoint?: string } | null;
   await updateDb((db) => {
     db.pushSubs = db.pushSubs.filter((sub) => !(sub.userId === user.id && (!body?.endpoint || sub.endpoint === body.endpoint)));

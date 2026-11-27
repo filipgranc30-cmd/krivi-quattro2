@@ -53,7 +53,7 @@ export default function LoginPage() {
         </PrimaryButton>
       </form>
       <p className="mt-6 text-center text-xs leading-relaxed text-zinc-500">
-        Prvi registrirani račun postaje admin. Ako je u Vercelu postavljen ADMIN_EMAIL, taj e-mail dobiva admin ulogu i kasnije.
+        Prvi račun i ADMIN_EMAIL postaju admin odmah. Svi ostali čekaju da admin odobri pristup.
       </p>
     </div>
   );

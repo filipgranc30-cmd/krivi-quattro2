@@ -1,8 +1,11 @@
+import { currentUser, pendingBlock } from "@/lib/server/auth";
 import { getLeague, getLeagueIndex } from "@/lib/server/psgz";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const blocked = pendingBlock(await currentUser());
+  if (blocked) return blocked;
   const { id: raw } = await context.params;
   const id = Number(raw);
   if (!Number.isInteger(id) || id < 1 || id > 99999) {

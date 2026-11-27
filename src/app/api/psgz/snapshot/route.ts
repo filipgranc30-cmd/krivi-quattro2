@@ -1,8 +1,11 @@
+import { currentUser, pendingBlock } from "@/lib/server/auth";
 import { getSnapshot } from "@/lib/server/psgz";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const blocked = pendingBlock(await currentUser());
+  if (blocked) return blocked;
   try {
     const snapshot = await getSnapshot();
     return Response.json({ ok: true, snapshot });
