@@ -1,5 +1,5 @@
-import { applyPdcImport, parsePdcTournament, type PdcFixture } from "../shared/pdc";
-import { cloneDailyDarts, DEFAULT_PDC_TOURNAMENT } from "../shared/daily-darts";
+import { applyPdcImport, parsePdcTournament, tournamentNameOf, type PdcFixture } from "../shared/pdc";
+import { cloneDailyDarts, DEFAULT_PDC_TOURNAMENT, tournamentIdsOf } from "../shared/daily-darts";
 import { redis, isSharedMode } from "./redis";
 import { readDb, updateDb } from "./store";
 
@@ -9,7 +9,7 @@ const THROTTLE_MS = 15 * 60 * 1000;
 
 export type PdcSyncResult = { ok: boolean; skipped?: boolean; message: string; lastSyncAt?: string };
 
-export async function fetchPdcTournament(tournamentId = DEFAULT_PDC_TOURNAMENT): Promise<PdcFixture[] | null> {
+export async function fetchPdcTournament(tournamentId = DEFAULT_PDC_TOURNAMENT): Promise<{ id: string; name: string; fixtures: PdcFixture[] } | null> {
   const id = /^\d{3,8}$/.test(tournamentId) ? tournamentId : DEFAULT_PDC_TOURNAMENT;
   try {
     const response = await fetch(`https://tournaments.darts.web.gc.pdcservices.co.uk/v2/${id}`, {
@@ -18,7 +18,11 @@ export async function fetchPdcTournament(tournamentId = DEFAULT_PDC_TOURNAMENT):
       signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) return null;
-    return parsePdcTournament(await response.json());
+    const body: unknown = await response.json();
+    const fixtures = parsePdcTournament(body);
+    if (!fixtures) return null;
+    const name = tournamentNameOf(body) || `PDC ${id}`;
+    return { id, name, fixtures: fixtures.map((fixture) => ({ ...fixture, tournamentId: id, tournamentName: name })) };
   } catch {
     return null;
   }
@@ -33,9 +37,10 @@ export async function syncPdc(options: { force?: boolean } = {}): Promise<PdcSyn
     }
   }
   const current = await readDb();
-  const tournamentId = current.dailyDarts.tournamentId || DEFAULT_PDC_TOURNAMENT;
-  const fixtures = await fetchPdcTournament(tournamentId);
-  if (!fixtures) return { ok: false, message: "PDC raspored trenutno nije dostupan." };
+  const ids = tournamentIdsOf(current.dailyDarts);
+  const bundles = (await Promise.all(ids.map((id) => fetchPdcTournament(id)))).filter((item): item is NonNullable<typeof item> => Boolean(item));
+  if (!bundles.length) return { ok: false, message: "PDC raspored trenutno nije dostupan." };
+  const fixtures = bundles.flatMap((bundle) => bundle.fixtures);
   let message = "";
   await updateDb((db) => {
     const applied = applyPdcImport(cloneDailyDarts(db.dailyDarts), fixtures);

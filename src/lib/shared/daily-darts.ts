@@ -7,20 +7,24 @@ export const DEFAULT_SCORING: DailyDartsScoring = {
   averageBase: 90,
   averagePoint: 1,
   oneEighty: 3,
+  oneForty: 1,
+  oneHundred: 0.5,
+  checkoutPercentStep: 10,
+  checkoutPercentPoint: 1,
   checkoutOver100: 5,
-  checkoutRound4: 8,
-  checkoutRound5: 5,
-  checkoutBull: 5,
-  bigFish: 15,
-  nineDarter: 50,
+  highest100: 3,
+  highest150: 6,
+  highest170: 15,
 };
 
 export const TOURNAMENT_START = "2026-12-11";
 export const TOURNAMENT_END = "2027-01-03";
-export const TEASER_START = "2026-12-01";
+export const TEASER_START = "2026-11-27";
 export const TEASER_END = "2027-01-04";
 
 export const DEFAULT_PDC_TOURNAMENT = "10873";
+export const TRIAL_TOURNAMENT_ID = "10872";
+export const DEFAULT_TOURNAMENT_IDS = [TRIAL_TOURNAMENT_ID, DEFAULT_PDC_TOURNAMENT];
 
 export function defaultDailyDarts(): DailyDartsState {
   return {
@@ -32,9 +36,20 @@ export function defaultDailyDarts(): DailyDartsState {
     scoring: { ...DEFAULT_SCORING },
     reminderSent: [],
     tournamentId: DEFAULT_PDC_TOURNAMENT,
+    tournamentIds: [...DEFAULT_TOURNAMENT_IDS],
     lastSyncAt: "",
     lastSyncMessage: "",
   };
+}
+
+export function tournamentIdsOf(state: { tournamentIds?: string[]; tournamentId?: string } | undefined): string[] {
+  const raw = state?.tournamentIds?.length ? state.tournamentIds : state?.tournamentId ? [state.tournamentId] : DEFAULT_TOURNAMENT_IDS;
+  const ids = [...new Set(raw.map((id) => id.trim()).filter((id) => /^\d{3,8}$/.test(id)))];
+  return ids.length ? ids : [...DEFAULT_TOURNAMENT_IDS];
+}
+
+export function isTrialTournament(id: string | undefined): boolean {
+  return id === TRIAL_TOURNAMENT_ID;
 }
 
 export function cloneDailyDarts(state: DailyDartsState | undefined): DailyDartsState {
@@ -43,11 +58,12 @@ export function cloneDailyDarts(state: DailyDartsState | undefined): DailyDartsS
     players: source.players.map((item) => ({ ...item })),
     days: source.days.map((item) => ({ ...item })),
     matches: source.matches.map((item) => ({ ...item })),
-    stats: source.stats.map((item) => ({ ...item })),
+    stats: source.stats.map((item) => normalizeStat(item)),
     picks: source.picks.map((item) => ({ ...item, playerIds: [...item.playerIds] })),
-    scoring: { ...DEFAULT_SCORING, ...source.scoring },
+    scoring: knownScoring(source.scoring),
     reminderSent: [...(source.reminderSent ?? [])],
     tournamentId: source.tournamentId || DEFAULT_PDC_TOURNAMENT,
+    tournamentIds: tournamentIdsOf(source),
     lastSyncAt: source.lastSyncAt || "",
     lastSyncMessage: source.lastSyncMessage || "",
   };
@@ -71,19 +87,34 @@ export function isDayLocked(day: DailyDartsDay, now = new Date()): boolean {
 
 export function playerDayPoints(stat: DailyDartsStat | undefined, scoring: DailyDartsScoring): number {
   if (!stat) return 0;
-  const average = Math.round((Number(stat.average) || 0) * 100) / 100;
-  const above = Math.max(0, Math.floor(average - scoring.averageBase + 1e-9));
+  const row = normalizeStat(stat);
+  const rules = knownScoring(scoring);
+  const average = Math.round(row.average * 100) / 100;
+  const above = Math.max(0, Math.floor(average - rules.averageBase + 1e-9));
   return (
-    (stat.won ? scoring.win : 0) +
-    above * scoring.averagePoint +
-    count(stat.count180) * scoring.oneEighty +
-    count(stat.checkoutOver100) * scoring.checkoutOver100 +
-    count(stat.checkoutRound4) * scoring.checkoutRound4 +
-    count(stat.checkoutRound5) * scoring.checkoutRound5 +
-    count(stat.checkoutBull) * scoring.checkoutBull +
-    count(stat.bigFish) * scoring.bigFish +
-    count(stat.nineDarter) * scoring.nineDarter
+    (row.won ? rules.win : 0) +
+    above * rules.averagePoint +
+    row.count180 * rules.oneEighty +
+    row.count140 * rules.oneForty +
+    row.count100 * rules.oneHundred +
+    checkoutPercentPoints(row.checkoutHits, row.checkoutAttempts, rules) +
+    row.checkoutOver100 * rules.checkoutOver100 +
+    highestCheckoutBonus(row.highestCheckout, rules)
   );
+}
+
+function checkoutPercentPoints(hits: number, attempts: number, scoring: DailyDartsScoring): number {
+  if (attempts <= 0 || scoring.checkoutPercentStep <= 0) return 0;
+  const percent = (hits / attempts) * 100;
+  const steps = Math.floor(percent / scoring.checkoutPercentStep + 1e-9);
+  return Math.max(0, steps) * scoring.checkoutPercentPoint;
+}
+
+function highestCheckoutBonus(value: number, scoring: DailyDartsScoring): number {
+  if (value >= 170) return scoring.highest170;
+  if (value >= 150) return scoring.highest150;
+  if (value >= 100) return scoring.highest100;
+  return 0;
 }
 
 export function statsForPlayerOnDay(state: DailyDartsState, dayId: string, playerId: string): DailyDartsStat | undefined {
@@ -115,19 +146,24 @@ export function upsertMatchStats(state: DailyDartsState, matchId: string, rows: 
     if (!allowed.has(row.playerId)) return { state, error: "Statistika mora biti za igrače tog meča." };
     const average = Number(row.average);
     if (!Number.isFinite(average) || average < 0 || average > 180) return { state, error: "Prosjek nije ispravan." };
-    clean.push({
+    const hits = count(row.checkoutHits);
+    const attempts = count(row.checkoutAttempts);
+    if (hits > attempts) return { state, error: "Izlazi: pogođeno ne može biti veće od pokušaja." };
+    const highest = checkoutScore(row.highestCheckout);
+    if (Number(row.highestCheckout) > 170) return { state, error: "Najveći izlaz je od 0 do 170." };
+    clean.push(normalizeStat({
       matchId,
       playerId: row.playerId,
       won: Boolean(row.won),
       average: Math.round(average * 100) / 100,
       count180: count(row.count180),
-      checkoutBull: count(row.checkoutBull),
-      bigFish: count(row.bigFish),
-      checkoutRound4: count(row.checkoutRound4),
-      checkoutRound5: count(row.checkoutRound5),
-      nineDarter: count(row.nineDarter),
+      count140: count(row.count140),
+      count100: count(row.count100),
+      checkoutHits: hits,
+      checkoutAttempts: attempts,
       checkoutOver100: count(row.checkoutOver100),
-    });
+      highestCheckout: highest,
+    }));
   }
   if (clean.filter((row) => row.won).length > 1) return { state, error: "Samo jedan igrač može dobiti meč." };
   return { state: { ...state, stats: [...state.stats.filter((stat) => stat.matchId !== matchId), ...clean] } };
@@ -145,7 +181,7 @@ export function publicDailyDarts(state: DailyDartsState | undefined, viewer: Use
     myPicks: viewer ? daily.picks.filter((pick) => pick.userId === viewer.id) : [],
     revealedPicks: daily.picks.filter((pick) => locked.has(pick.dayId)),
     pickCounts: daily.days.map((day) => ({ dayId: day.id, count: daily.picks.filter((pick) => pick.dayId === day.id).length })),
-    tournamentId: daily.tournamentId || DEFAULT_PDC_TOURNAMENT,
+    tournamentIds: tournamentIdsOf(daily),
     lastSyncAt: daily.lastSyncAt || "",
     lastSyncMessage: daily.lastSyncMessage || "",
   };
@@ -167,8 +203,23 @@ export function dailyRanking(state: DailyDartsState, dayId: string): DailyRankRo
 
 export type OverallRow = { userId: string; name: string; points: number; days: number; bestDay: number; bestDayId: string };
 
-export function overallRanking(state: DailyDartsState, now = new Date()): OverallRow[] {
-  const locked = new Set(state.days.filter((day) => isDayLocked(day, now)).map((day) => day.id));
+export function dayIdsForTournament(state: DailyDartsState, tournamentId: string): Set<string> {
+  const ids = new Set<string>();
+  for (const match of state.matches) {
+    if (match.tournamentId === tournamentId) ids.add(match.dayId);
+  }
+  return ids;
+}
+
+export function defaultTournamentId(state: DailyDartsState, today: string): string {
+  const focus = focusDay(state.days, today);
+  const fromDay = focus ? state.matches.find((match) => match.dayId === focus.id && match.tournamentId)?.tournamentId : undefined;
+  return fromDay || tournamentIdsOf(state)[0];
+}
+
+export function overallRanking(state: DailyDartsState, now = new Date(), tournamentId?: string): OverallRow[] {
+  const allowedDays = tournamentId ? dayIdsForTournament(state, tournamentId) : null;
+  const locked = new Set(state.days.filter((day) => isDayLocked(day, now) && (!allowedDays || allowedDays.has(day.id))).map((day) => day.id));
   const map = new Map<string, OverallRow>();
   for (const pick of state.picks) {
     if (!locked.has(pick.dayId)) continue;
@@ -185,8 +236,9 @@ export function overallRanking(state: DailyDartsState, now = new Date()): Overal
   return [...map.values()].sort((a, b) => b.points - a.points || b.bestDay - a.bestDay || a.name.localeCompare(b.name, "hr"));
 }
 
-export function mostPickedPlayer(state: DailyDartsState, now = new Date()): { player: DailyDartsPlayer; count: number } | null {
-  const locked = new Set(state.days.filter((day) => isDayLocked(day, now)).map((day) => day.id));
+export function mostPickedPlayer(state: DailyDartsState, now = new Date(), tournamentId?: string): { player: DailyDartsPlayer; count: number } | null {
+  const allowedDays = tournamentId ? dayIdsForTournament(state, tournamentId) : null;
+  const locked = new Set(state.days.filter((day) => isDayLocked(day, now) && (!allowedDays || allowedDays.has(day.id))).map((day) => day.id));
   const counts = new Map<string, number>();
   for (const pick of state.picks) {
     if (!locked.has(pick.dayId)) continue;
@@ -302,9 +354,9 @@ export function applyDailyAction(state: DailyDartsState, actor: UserPublic, acti
   }
   if (action.op === "dailySetStats") return upsertMatchStats(state, action.matchId, action.rows);
   if (action.op === "dailySetTournament") {
-    const tournamentId = action.tournamentId.trim();
-    if (!/^\d{3,8}$/.test(tournamentId)) return { state, error: "ID turnira je broj, npr. 10873." };
-    return { state: { ...state, tournamentId } };
+    const ids = [...new Set(action.tournamentId.split(/[^0-9]+/).filter((id) => /^\d{3,8}$/.test(id)))];
+    if (!ids.length) return { state, error: "Upiši PDC ID-eve, npr. 10872, 10873." };
+    return { state: { ...state, tournamentIds: ids, tournamentId: ids[0] } };
   }
   return { state };
 }
@@ -319,10 +371,42 @@ function sanitizeScoring(input: DailyDartsScoring): DailyDartsScoring | null {
   return next;
 }
 
+function normalizeStat(raw: Partial<DailyDartsStat> & { matchId?: string; playerId?: string }): DailyDartsStat {
+  return {
+    matchId: raw.matchId || "",
+    playerId: raw.playerId || "",
+    won: Boolean(raw.won),
+    average: Number(raw.average) || 0,
+    count180: count(Number(raw.count180) || 0),
+    count140: count(Number(raw.count140) || 0),
+    count100: count(Number(raw.count100) || 0),
+    checkoutHits: count(Number(raw.checkoutHits) || 0),
+    checkoutAttempts: count(Number(raw.checkoutAttempts) || 0),
+    checkoutOver100: count(Number(raw.checkoutOver100) || 0),
+    highestCheckout: checkoutScore(raw.highestCheckout),
+  };
+}
+
+function checkoutScore(value: unknown): number {
+  const parsed = Math.round(Number(value) || 0);
+  if (parsed < 0) return 0;
+  return Math.min(170, parsed);
+}
+
+function knownScoring(input: Partial<DailyDartsScoring> | undefined): DailyDartsScoring {
+  const next = { ...DEFAULT_SCORING };
+  if (!input) return next;
+  for (const key of Object.keys(DEFAULT_SCORING) as (keyof DailyDartsScoring)[]) {
+    const value = Number(input[key]);
+    if (Number.isFinite(value)) next[key] = value;
+  }
+  return next;
+}
+
 function count(value: number): number {
   const parsed = Math.round(Number(value) || 0);
   if (parsed < 0) return 0;
-  return Math.min(30, parsed);
+  return Math.min(99, parsed);
 }
 
 export function dayPlayersFromMatches(matches: DailyDartsMatch[], players: DailyDartsPlayer[], dayId: string): string[] {
