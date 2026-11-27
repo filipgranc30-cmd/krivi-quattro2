@@ -106,6 +106,7 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
   const [round, setRound] = useState("");
   const [dart, setDart] = useState<number | null>(null);
   const [remaining, setRemaining] = useState("");
+  const [oneEighties, setOneEighties] = useState<number[]>(() => players.map(() => 0));
   const [error, setError] = useState("");
   const summaries = summarizeQuickMatch(2, legs);
   const done = summaries.some((player) => player.legsWon >= target);
@@ -138,10 +139,11 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
       setError(parsed.error);
       return;
     }
-    setLegs((current) => [...current, parsed.leg]);
+    setLegs((current) => [...current, { ...parsed.leg, oneEighties: players.map((_, index) => Math.max(0, oneEighties[index] || 0)) }]);
     setWinnerIndex(null);
     setDart(null);
     setRemaining("");
+    setOneEighties(players.map(() => 0));
     setError("");
   };
 
@@ -224,6 +226,21 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
             className="h-14 w-full rounded-xl border border-orange-500/40 bg-black px-3 text-2xl outline-none focus:border-orange-400"
           />
         </label>
+        <div>
+          <div className="text-xs text-zinc-400">180</div>
+          <div className="mt-2 space-y-2">
+            {players.map((person, index) => (
+              <div key={person.key} className="flex items-center justify-between gap-3">
+                <span className="truncate text-sm">{person.name}</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="h-11 w-11 rounded-xl border border-white/15 text-xl" onClick={() => setOneEighties((current) => current.map((value, item) => (item === index ? Math.max(0, value - 1) : value)))}>–</button>
+                  <div className="font-display w-8 text-center text-2xl">{oneEighties[index] ?? 0}</div>
+                  <button type="button" className="h-11 w-11 rounded-xl border border-white/15 text-xl" onClick={() => setOneEighties((current) => current.map((value, item) => (item === index ? Math.min(20, value + 1) : value)))}>+</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         {preview && (
           <p className="text-sm text-zinc-300">
             Pobjednik {preview.winnerDarts} strelica, prosjek {preview.winnerAvg.toFixed(1)}. Gubitnik {preview.loserDarts} strelica, prosjek {preview.loserAvg.toFixed(1)}.
@@ -242,6 +259,7 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
               </div>
               <div className="text-xs text-zinc-500">
                 {players[leg.loserIndex]?.name} ostalo {leg.loserRemaining} · {leg.loserDarts} strelica · prosjek {leg.loserAvg.toFixed(1)}
+                {leg.oneEighties.some((count) => count > 0) ? ` · 180: ${leg.oneEighties.map((count, index) => `${players[index]?.name.split(" ")[0]} ${count}`).join(", ")}` : ""}
               </div>
             </div>
           ))}
@@ -292,6 +310,7 @@ function QuickResult({
             <Stat label="Prosjek" value={player.average.toFixed(1)} />
             <Stat label="Najbolji leg" value={player.bestLegDarts ? `${player.bestLegDarts} strelica` : "—"} />
             <Stat label="Checkout" value={player.checkout ?? "—"} />
+            <Stat label="180" value={String(player.count180)} />
           </dl>
         </Card>
       ))}

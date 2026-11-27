@@ -9,6 +9,7 @@ import { DEFAULT_TRAINING_PLAYER } from "@/lib/shared/seed";
 import type { AppData, GamePlayerResult, SavedGame } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
+import { QuickCricket } from "./quick-cricket";
 import { Quick501 } from "./quick501";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "./ui";
 
@@ -22,6 +23,7 @@ export function GameScreen({ type }: { type: GameType }) {
   const selection = picked ?? defaultTrainingPick(people, user?.id);
   const [started, setStarted] = useState(false);
   const [mode501, setMode501] = useState<"quick" | "detail">("quick");
+  const [modeCricket, setModeCricket] = useState<"quick" | "detail">("quick");
   const [legsToWin, setLegsToWin] = useState(2);
   const [setsToWin, setSetsToWin] = useState(1);
   const [rounds, setRounds] = useState(type === "marathon" ? 10 : 8);
@@ -29,6 +31,9 @@ export function GameScreen({ type }: { type: GameType }) {
 
   if (type === "501" && mode501 === "quick") {
     return <Quick501 people={people} userId={user?.id} onDetailed={() => setMode501("detail")} />;
+  }
+  if (type === "cricket" && modeCricket === "quick") {
+    return <QuickCricket people={people} userId={user?.id} onDetailed={() => setModeCricket("detail")} />;
   }
 
   if (!started) {
@@ -39,7 +44,7 @@ export function GameScreen({ type }: { type: GameType }) {
           <p className="mt-1 text-sm text-zinc-400">
             {type === "marathon"
               ? "20 rundi po 3 strelice. Meta ide Bull, D20, D19 … D1. Pogodak odmah prebacuje na sljedeću metu. Igra staje nakon 20 rundi ili kad netko pogodi D1."
-              : type === "501"
+              : type === "501" || type === "cricket"
                 ? "Detaljno bodovanje. Odaberi tko igra. Redoslijed je red bacanja."
                 : "Odaberi tko igra. Redoslijed je red bacanja."}
           </p>
@@ -76,8 +81,8 @@ export function GameScreen({ type }: { type: GameType }) {
         <PrimaryButton className="w-full" disabled={!selected.length} onClick={() => setStarted(true)}>
           Kreni
         </PrimaryButton>
-        {type === "501" && (
-          <button type="button" className="w-full text-center text-sm text-orange-300 underline" onClick={() => setMode501("quick")}>
+        {(type === "501" || type === "cricket") && (
+          <button type="button" className="w-full text-center text-sm text-orange-300 underline" onClick={() => (type === "501" ? setMode501("quick") : setModeCricket("quick"))}>
             Brzi unos
           </button>
         )}
@@ -348,6 +353,7 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
             <div className="mt-1 text-[11px] text-zinc-500">
               {player.sets > 0 || setsToWin > 1 ? `${player.sets} set · ` : ""}
               {player.legs} leg · prosjek {player.darts ? ((player.scored / player.darts) * 3).toFixed(1) : "0"}
+              {player.c180 ? ` · 180: ${player.c180}` : ""}
             </div>
           </div>
         ))}
@@ -745,7 +751,7 @@ function ResultBox({ type, summary, players }: { type: GameType; summary: string
               {type === "marathon"
                 ? `${player.totalScore ?? 0} pogodaka${player.marathonPoints != null ? ` · ${player.marathonPoints} bod` : ""}`
                 : type === "501"
-                  ? `prosjek ${player.threeDartAvg ?? 0}${player.legsWon != null ? ` · legovi ${player.legsWon}` : ""}${player.bestLegDarts ? ` · najbolji leg ${player.bestLegDarts}` : ""}${player.checkout ? ` · ${player.checkout}` : ""}`
+                  ? `prosjek ${player.threeDartAvg ?? 0}${player.legsWon != null ? ` · legovi ${player.legsWon}` : ""}${player.bestLegDarts ? ` · najbolji leg ${player.bestLegDarts}` : ""}${player.checkout ? ` · ${player.checkout}` : ""}${player.count180 ? ` · 180: ${player.count180}` : ""}`
                   : `${player.threeDartAvg != null ? `prosjek ${player.threeDartAvg}` : ""}${player.cricketMpr != null ? `MPR ${player.cricketMpr}` : ""}${player.totalScore != null ? ` · ${player.totalScore}` : ""}`}
             </span>
           </li>
