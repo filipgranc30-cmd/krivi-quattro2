@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
 import { leagueBadge, nextMatch, opponentBoard } from "@/lib/shared/schedule";
@@ -69,13 +70,9 @@ export default function DashboardPage() {
             <h2 className="font-display mt-1 text-center text-5xl font-bold leading-none text-orange-400">{match.opponent}</h2>
             <p className="mt-2 text-center text-sm text-zinc-300">{match.venue || (match.home ? data.settings.venue : "Mjesto nije objavljeno")}</p>
             {match.source === "demo" && <p className="mt-2 text-center text-xs text-amber-200">Demo susret iz skice, nije iz službenog rasporeda.</p>}
-            {match.eventUrl && (
-              <p className="mt-2 text-center text-xs">
-                <a className="text-orange-300 underline" href={match.eventUrl} target="_blank" rel="noreferrer">
-                  Zapisnik na psgz.hr
-                </a>
-              </p>
-            )}
+            <p className="mt-2 text-center">
+              <ZapisnikLink eventUrl={match.eventUrl} className="text-xs font-semibold text-orange-300 underline" />
+            </p>
             <div className="mt-4">
               <AttendancePanel targetId={match.key} attendance={data.attendance.filter((item) => item.kind === "match")} mine={mine?.status} onSet={setStatus} disabled={pending} />
             </div>

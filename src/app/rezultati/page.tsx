@@ -1,6 +1,7 @@
 "use client";
 
 import { useApp } from "@/components/app-provider";
+import { ZapisnikLink } from "@/components/zapisnik-link";
 import { Card, SectionTitle, When } from "@/components/ui";
 import { resultsOf } from "@/lib/shared/schedule";
 
@@ -23,7 +24,7 @@ export default function ResultsPage() {
             </div>
             <div className="font-display text-4xl text-orange-300">{fixture.scoreUs}:{fixture.scoreThem}</div>
           </div>
-          {fixture.eventUrl && <a className="mt-2 block text-xs text-orange-300 underline" href={fixture.eventUrl} target="_blank" rel="noreferrer">Zapisnik</a>}
+          <ZapisnikLink eventUrl={fixture.eventUrl} />
         </Card>
       ))}
       {!results.length && <p className="text-sm text-zinc-400">Još nema učitanih rezultata.</p>}

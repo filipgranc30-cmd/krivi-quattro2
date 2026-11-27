@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, Field, GhostButton, PrimaryButton, SectionTitle, When } from "@/components/ui";
 import { fromDatetimeLocal, formatWhen, toDatetimeLocal } from "@/lib/shared/dates";
 import { nextMatch, shownFixtures } from "@/lib/shared/schedule";
@@ -61,7 +62,7 @@ export default function SchedulePage() {
             {fixture.played && (
               <div className="mt-2 font-display text-3xl text-orange-300">{fixture.scoreUs}:{fixture.scoreThem}</div>
             )}
-            {fixture.eventUrl && <a className="mt-1 block text-xs text-orange-300 underline" href={fixture.eventUrl} target="_blank" rel="noreferrer">Zapisnik</a>}
+            <ZapisnikLink eventUrl={fixture.eventUrl} />
             {open && (
               <div className="mt-3">
                 <AttendancePanel
