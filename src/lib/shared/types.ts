@@ -90,6 +90,8 @@ export type GamePlayerResult = {
   bestCheckout?: number;
   cricketMpr?: number;
   totalScore?: number;
+  /** Marathon only: total points (bull 50, double × 2). Hits stay in totalScore. */
+  marathonPoints?: number;
 };
 
 export type SavedGame = {
