@@ -3,13 +3,14 @@ import {
   createSession,
   hashPassword,
   normalizeEmail,
-  roleForNewUser,
   setSessionCookie,
   validateCredentials,
 } from "@/lib/server/auth";
+import { sendPush } from "@/lib/server/push";
 import { isSharedMode } from "@/lib/server/redis";
 import { updateDb } from "@/lib/server/store";
-import { publicUser } from "@/lib/shared/mutate";
+import { accountStatus } from "@/lib/shared/types";
+import { publicUser, registerAccount } from "@/lib/shared/mutate";
 import { clampText, uid } from "@/lib/shared/util";
 
 export const dynamic = "force-dynamic";
@@ -30,14 +31,7 @@ export async function POST(request: Request) {
       if (db.users.some((user) => user.email === email)) throw new Error("EXISTS");
       if (db.users.length > 200) throw new Error("FULL");
       createdId = uid();
-      db.users.push({
-        id: createdId,
-        email,
-        name,
-        role: roleForNewUser(email, db.users),
-        createdAt: new Date().toISOString(),
-        passwordHash,
-      });
+      registerAccount(db, { id: createdId, email, name, passwordHash, adminEmail: adminEmail() || null });
       return db;
     });
   } catch (error) {
@@ -51,6 +45,10 @@ export async function POST(request: Request) {
   const { readDb } = await import("@/lib/server/store");
   const db = await readDb();
   const user = db.users.find((item) => item.id === createdId);
+  if (user && accountStatus(user) === "pending") {
+    const admins = db.users.filter((item) => item.role === "admin" && accountStatus(item) === "active").map((item) => item.id);
+    await sendPush(db, user.id, { title: "Krivi Quattro", body: `Novi zahtjev za registraciju: ${user.name}`, url: "/vise" }, admins);
+  }
   return Response.json({
     ok: true,
     user: user ? publicUser(user) : null,

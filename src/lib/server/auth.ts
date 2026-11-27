@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import type { StoredUser, UserPublic } from "../shared/types";
+import type { UserPublic } from "../shared/types";
 import { publicUser } from "../shared/mutate";
 import { clampText } from "../shared/util";
 import { readDb, updateDb } from "./store";
@@ -121,9 +121,9 @@ export async function destroySession() {
   await clearSessionCookie();
 }
 
-export function roleForNewUser(email: string, existing: StoredUser[]): "admin" | "member" {
-  const configured = adminEmail();
-  if (existing.length === 0) return "admin";
-  if (configured && email === configured) return "admin";
-  return "member";
+export function pendingBlock(user: UserPublic | null): Response | null {
+  if (user && user.status === "pending") {
+    return Response.json({ ok: false, pending: true, user, error: "Čeka odobrenje admina." }, { status: 403 });
+  }
+  return null;
 }

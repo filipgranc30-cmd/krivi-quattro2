@@ -1,4 +1,4 @@
-import { applyAction, publicUser, toPublic } from "../shared/mutate";
+import { applyAction, publicUser, registerAccount, toPublic } from "../shared/mutate";
 import { emptyDb, stripDemoData } from "../shared/seed";
 import type { Action, AppData, Db, UserPublic } from "../shared/types";
 import { uid } from "../shared/util";
@@ -66,20 +66,23 @@ export function localData(user: UserPublic | null): AppData {
   return toPublic(read(), user);
 }
 
-export async function localRegister(name: string, email: string, password: string): Promise<{ user: UserPublic } | { error: string }> {
+export async function localRegister(
+  name: string,
+  email: string,
+  password: string,
+  adminEmail: string | null,
+): Promise<{ user: UserPublic } | { error: string }> {
   const db = read();
   const normalized = email.trim().toLowerCase();
   if (db.users.some((user) => user.email === normalized)) return { error: "Račun s tim e-mailom već postoji." };
   const passwordHash = await pbkdf2(password);
-  const user = {
+  const user = registerAccount(db, {
     id: uid(),
     email: normalized,
     name: name.trim(),
-    role: (db.users.length === 0 ? "admin" : "member") as "admin" | "member",
-    createdAt: new Date().toISOString(),
     passwordHash,
-  };
-  db.users.push(user);
+    adminEmail,
+  });
   write(db);
   localStorage.setItem(SESSION_KEY, user.id);
   return { user: publicUser(user) };

@@ -1,12 +1,20 @@
 export type Role = "admin" | "member";
 
+/** Missing status on older accounts means active. */
+export type AccountStatus = "pending" | "active";
+
 export type UserPublic = {
   id: string;
   email: string;
   name: string;
   role: Role;
+  status: AccountStatus;
   createdAt: string;
 };
+
+export function accountStatus(user: { status?: AccountStatus | null }): AccountStatus {
+  return user.status === "pending" ? "pending" : "active";
+}
 
 export type AttendanceStatus = "dolazim" | "ne_dolazim" | "mozda";
 
@@ -122,6 +130,7 @@ export type Member = {
   id: string;
   name: string;
   role: Role;
+  status: AccountStatus;
   createdAt: string;
   email: string;
 };
@@ -135,6 +144,7 @@ export type AppData = {
   games: SavedGame[];
   settings: Settings;
   members: Member[];
+  pendingRequests: Member[];
 };
 
 export type StoredUser = UserPublic & { passwordHash: string };
@@ -177,7 +187,9 @@ export type Action =
   | { op: "deleteScout"; club: string }
   | { op: "saveGame"; game: Omit<SavedGame, "id"> }
   | { op: "deleteGame"; id: string }
-  | { op: "setRole"; userId: string; role: Role };
+  | { op: "setRole"; userId: string; role: Role }
+  | { op: "approveUser"; userId: string }
+  | { op: "rejectUser"; userId: string };
 
 export type LeagueInfo = { id: number; name: string; group: string };
 

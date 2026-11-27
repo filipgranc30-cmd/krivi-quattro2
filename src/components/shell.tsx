@@ -12,9 +12,10 @@ const NAV = [
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { data, mode } = useApp();
+  const { data, mode, user } = useApp();
   const path = usePathname();
   const unread = data.notifications.filter((item) => !item.read).length;
+  const pendingCount = user?.role === "admin" ? data.pendingRequests.length : 0;
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-ink">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-ink/95 px-4 py-3 backdrop-blur">
@@ -45,8 +46,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
             const active = path === item.href || (item.href !== "/dashboard" && path.startsWith(item.href));
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] ${active ? "text-orange-400" : "text-zinc-500"}`}>
-                <Icon active={active} />
+              <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] ${active ? "text-orange-400" : "text-zinc-500"}`}>
+                <span className="relative">
+                  <Icon active={active} />
+                  {item.href === "/vise" && pendingCount > 0 && (
+                    <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-black">
+                      {pendingCount > 9 ? "9+" : pendingCount}
+                    </span>
+                  )}
+                </span>
                 {item.label}
               </Link>
             );
