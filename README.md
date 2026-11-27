@@ -11,10 +11,12 @@ U repozitoriju je bila samo arhiva `krivi-quattro-vercel-fixed.tar.gz`. Na korij
 Aplikacija sada stoji u korijenu repozitorija. U Vercel projektu **krivi-quattro2** provjeri:
 
 - **Root Directory:** prazno (korijen repozitorija). Ne smije biti `krivi-quattro`.
-- **Framework Preset:** Next.js
-- **Build Command:** `npm run build` (zadano)
-- **Output Directory:** prazno. Nemoj upisivati `out`, `public` ni `.next`.
+- **Framework Preset:** Next.js. Isključi Override ako piše Other.
+- **Build Command:** `npm run build`, bez uključenog Overridea.
+- **Output Directory:** prazno, Override isključen. Nemoj upisivati `public`, `out` ni `.next`.
 - **Install Command:** `npm install`
+
+Ako `https://krivi-quattro2.vercel.app/logo.jpg` radi, a `/login` i dalje vraća Vercelov `NOT_FOUND`, projekt je i dalje objavljen kao obične datoteke iz `public/`. Tada u Settings → Build and Deployment → Framework Settings postavi preset na Next.js i isključi Override na Output Directory, pa Redeploy.
 
 Nema statičkog izvoza (`output: 'export'`). Trebaju serverske rute.
 
