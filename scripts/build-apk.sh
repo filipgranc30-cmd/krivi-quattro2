@@ -92,4 +92,5 @@ aligned="$work/aligned.apk"
   --out "$OUT" \
   "$aligned"
 "$build_tools/apksigner" verify --verbose "$OUT"
+rm -f "$OUT.idsig"
 echo "Signed APK: $OUT ($(wc -c < "$OUT") bytes)"
