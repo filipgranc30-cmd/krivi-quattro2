@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
@@ -119,6 +120,7 @@ export default function DashboardPage() {
         </ol>
       </Card>
 
+      <DailyDartsTeaser />
       <TurniriTeaser />
 
       <div className="grid grid-cols-2 gap-3">
