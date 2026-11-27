@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { suggestCheckout } from "@/lib/shared/checkout";
 import { createMarathon, MARATHON_ROUNDS, MARATHON_TARGETS, marathonWinner, throwMarathonDart, type MarathonState } from "@/lib/shared/marathon";
-import { checkoutLabel } from "@/lib/shared/quick501";
+import { checkoutLabel, firstTo } from "@/lib/shared/quick501";
 import { DEFAULT_TRAINING_PLAYER } from "@/lib/shared/seed";
 import type { AppData, GamePlayerResult, SavedGame } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
@@ -24,8 +24,7 @@ export function GameScreen({ type }: { type: GameType }) {
   const [started, setStarted] = useState(false);
   const [mode501, setMode501] = useState<"quick" | "detail">("quick");
   const [modeCricket, setModeCricket] = useState<"quick" | "detail">("quick");
-  const [legsToWin, setLegsToWin] = useState(2);
-  const [setsToWin, setSetsToWin] = useState(1);
+  const [bestOf501, setBestOf501] = useState(3);
   const [rounds, setRounds] = useState(type === "marathon" ? 10 : 8);
   const selected = people.filter((person) => selection.includes(person.key));
 
@@ -68,9 +67,16 @@ export function GameScreen({ type }: { type: GameType }) {
           })}
         </div>
         {type === "501" && (
-          <Card className="grid grid-cols-2 gap-3">
-            <Stepper label="Legovi" value={legsToWin} min={1} max={5} onChange={setLegsToWin} />
-            <Stepper label="Setovi" value={setsToWin} min={1} max={3} onChange={setSetsToWin} />
+          <Card>
+            <div className="text-xs text-zinc-400">Best of</div>
+            <div className="mt-2 flex items-center gap-3">
+              <button type="button" className="h-12 w-12 rounded-xl border border-white/15 text-xl" onClick={() => setBestOf501((value) => Math.max(1, value - 2))}>–</button>
+              <div className="min-w-16 text-center">
+                <div className="font-display text-3xl">{bestOf501}</div>
+                <div className="text-[11px] text-zinc-500">{bestOf501 === 1 ? "1 leg" : `prvi do ${firstTo(bestOf501)}`}</div>
+              </div>
+              <button type="button" className="h-12 w-12 rounded-xl border border-white/15 text-xl" onClick={() => setBestOf501((value) => Math.min(11, value + 2))}>+</button>
+            </div>
           </Card>
         )}
         {type === "highscore" && (
@@ -90,7 +96,7 @@ export function GameScreen({ type }: { type: GameType }) {
     );
   }
 
-  if (type === "501") return <Game501 players={selected} legsToWin={legsToWin} setsToWin={setsToWin} />;
+  if (type === "501") return <Game501 players={selected} legsToWin={firstTo(bestOf501)} setsToWin={1} />;
   if (type === "cricket") return <GameCricket players={selected} />;
   if (type === "marathon") return <GameMarathon players={selected} />;
   return <GameTotals type="highscore" players={selected} rounds={rounds} />;
@@ -340,7 +346,7 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
         <div>
           <SectionTitle>501 DOUBLE OUT</SectionTitle>
           <p className="text-xs text-zinc-400">
-            do {legsToWin} leg. {setsToWin > 1 ? `· do ${setsToWin} set.` : ""}
+            {setsToWin > 1 ? `do ${legsToWin} leg. · do ${setsToWin} set.` : `Best of ${legsToWin * 2 - 1} · prvi do ${legsToWin}`}
           </p>
         </div>
         <GhostButton onClick={undo}>Poništi</GhostButton>
