@@ -196,6 +196,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const act = useCallback(
     async (action: Action) => {
       if (!user) return "Nisi prijavljen.";
+      const preview = previewAttendance(data, user, action);
+      if (preview) setData(preview);
       if (status.mode === "local") {
         const result = localMutate(user, action);
         const session = localSessionUser();
@@ -203,19 +205,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setData(result.data);
         return result.error ?? null;
       }
-      const response = await fetch("/api/mutate", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
-      });
-      const body = await readJson(response);
-      if (!response.ok) return typeof body.error === "string" ? body.error : "Spremanje nije uspjelo.";
-      if (body.user) setUser(body.user as UserPublic);
-      if (body.data) setData(body.data as AppData);
-      return null;
+      try {
+        const response = await fetch("/api/mutate", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action),
+        });
+        const body = await readJson(response);
+        if (!response.ok) {
+          await loadShared();
+          return typeof body.error === "string" ? body.error : "Spremanje nije uspjelo.";
+        }
+        if (body.user) setUser(body.user as UserPublic);
+        if (body.data) setData(body.data as AppData);
+        return null;
+      } catch {
+        await loadShared();
+        return "Spremanje nije uspjelo.";
+      }
     },
-    [status.mode, user],
+    [data, loadShared, status.mode, user],
   );
 
   const enablePush = useCallback(async () => {
@@ -326,6 +336,29 @@ function Splash() {
       </div>
     </div>
   );
+}
+
+function previewAttendance(data: AppData, user: UserPublic, action: Action): AppData | null {
+  if (action.op !== "attendance" && action.op !== "clearAttendance") return null;
+  const rest = data.attendance.filter(
+    (item) => !(item.userId === user.id && item.kind === action.kind && item.targetId === action.targetId),
+  );
+  if (action.op === "clearAttendance") return { ...data, attendance: rest };
+  return {
+    ...data,
+    attendance: [
+      ...rest,
+      {
+        id: `pending-${action.kind}-${action.targetId}`,
+        kind: action.kind,
+        targetId: action.targetId,
+        userId: user.id,
+        userName: user.name,
+        status: action.status,
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  };
 }
 
 function urlBase64ToUint8Array(value: string) {

@@ -21,16 +21,20 @@ export default function TrainingPage() {
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index));
   const today = todayZagreb();
 
-  const setStatus = async (date: string, status: AttendanceStatus) => {
+  const setStatus = async (date: string, status: AttendanceStatus, current?: AttendanceStatus) => {
     setPending(date + status);
-    const time = data.settings.trainingTime || "18:00";
-    await act({
-      op: "attendance",
-      kind: "training",
-      targetId: date,
-      status,
-      label: `${weekdayName(date).toLowerCase()} ${formatDateHr(date)} u ${time}`,
-    });
+    if (current === status) {
+      await act({ op: "clearAttendance", kind: "training", targetId: date });
+    } else {
+      const time = data.settings.trainingTime || "18:00";
+      await act({
+        op: "attendance",
+        kind: "training",
+        targetId: date,
+        status,
+        label: `${weekdayName(date).toLowerCase()} ${formatDateHr(date)} u ${time}`,
+      });
+    }
     setPending("");
   };
 
@@ -61,8 +65,8 @@ export default function TrainingPage() {
                 </div>
                 <div className="mt-1 text-xs text-zinc-400">Dolazi: {coming.map((item) => item.userName.split(" ")[0]).join(", ") || "nitko"}</div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "dolazim")} className={`h-11 rounded-xl text-sm font-bold ${mine === "dolazim" ? "bg-orange-500 text-black" : "border border-orange-500/40"}`}>Dolazim</button>
-                  <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "ne_dolazim")} className={`h-11 rounded-xl text-sm font-bold ${mine === "ne_dolazim" ? "bg-red-500" : "border border-white/15"}`}>Ne dolazim</button>
+                  <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "dolazim", mine)} className={`h-11 rounded-xl text-sm font-bold ${mine === "dolazim" ? "bg-orange-500 text-black" : "border border-orange-500/40"}`}>Dolazim</button>
+                  <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "ne_dolazim", mine)} className={`h-11 rounded-xl text-sm font-bold ${mine === "ne_dolazim" ? "bg-red-500" : "border border-white/15"}`}>Ne dolazim</button>
                 </div>
               </div>
             );

@@ -25,7 +25,11 @@ export default function SchedulePage() {
   const [overrideWhen, setOverrideWhen] = useState(data.settings.nextOverride ? toDatetimeLocal(data.settings.nextOverride.datetime) : "");
   const [overrideHome, setOverrideHome] = useState(data.settings.nextOverride?.home ?? true);
 
-  const attend = async (key: string, label: string, status: AttendanceStatus) => {
+  const attend = async (key: string, label: string, status: AttendanceStatus | null) => {
+    if (status === null) {
+      await act({ op: "clearAttendance", kind: "match", targetId: key });
+      return;
+    }
     await act({ op: "attendance", kind: "match", targetId: key, status, label });
   };
 
