@@ -7,7 +7,7 @@ import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
-import { formatWhen } from "@/lib/shared/dates";
+import { formatDateHr, formatWhen, todayZagreb, weekdayName } from "@/lib/shared/dates";
 import { leagueBadge, nextMatch, opponentBoard } from "@/lib/shared/schedule";
 import type { AttendanceStatus } from "@/lib/shared/types";
 import { PSGZ_ORIGIN } from "@/lib/shared/club";
@@ -29,6 +29,10 @@ export default function DashboardPage() {
   const when = match ? formatWhen(match.datetime) : null;
   const board = match ? opponentBoard(match.opponent, data, snapshot, match.source === "demo") : { rows: [], note: "" };
   const mine = data.attendance.find((item) => item.kind === "match" && item.targetId === match?.key && item.userId === user?.id);
+  const today = todayZagreb();
+  const training = data.attendance.filter((item) => item.kind === "training" && item.targetId === today);
+  const trainingComing = training.filter((item) => item.status === "dolazim").map((item) => item.userName);
+  const trainingAbsent = training.filter((item) => item.status === "ne_dolazim").map((item) => item.userName);
 
   const setStatus = async (status: AttendanceStatus | null) => {
     if (!match || !when) return;
@@ -60,6 +64,16 @@ export default function DashboardPage() {
       {snapshotError && (
         <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{snapshotError}</p>
       )}
+
+      <Card>
+        <div className="flex items-baseline justify-between gap-3">
+          <SectionTitle>DANAS NA TRENINGU</SectionTitle>
+          <Link href="/trening" className="text-xs font-semibold text-orange-300">Otvori</Link>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">{weekdayName(today)} {formatDateHr(today)} · {data.settings.trainingTime}</p>
+        <p className="mt-2 text-sm text-zinc-300">Dolazi: {trainingComing.join(", ") || "nitko"}</p>
+        <p className="mt-1 text-sm text-red-300">Ne dolazi: {trainingAbsent.join(", ") || "nitko"}</p>
+      </Card>
 
       <Card>
         <SectionTitle>SLJEDEĆA UTAKMICA</SectionTitle>
