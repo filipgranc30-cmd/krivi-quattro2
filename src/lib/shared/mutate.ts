@@ -1,3 +1,5 @@
+import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, monthLabel, normalizeTreasury, roundEur } from "./blagajna";
+import { todayZagreb } from "./dates";
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import { PROOF_ID } from "./proof";
 import type { Action, AppData, Db, Member, NotificationItem, StoredUser, UserPublic } from "./types";
@@ -9,6 +11,30 @@ export type MutateResult = {
   error?: string;
   push?: { title: string; body: string; url: string; userIds?: string[] };
 };
+
+function sanitizeLedger(input: { date: string; amount: number; direction: string; account: string; category: string; description: string }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date || "")) return null;
+  if (input.direction !== "income" && input.direction !== "expense") return null;
+  if (input.account !== "cash" && input.account !== "bank") return null;
+  if (!isLedgerCategory(input.category)) return null;
+  if (!Number.isFinite(input.amount) || input.amount <= 0 || input.amount > 100000) return null;
+  const description = clampText(input.description || "", 160);
+  if (description.length < 2) return null;
+  const category = input.category;
+  const account = category === "stash" || category === "renta" ? "cash" : category === "racun" ? "bank" : input.account;
+  return {
+    date: input.date,
+    amount: roundEur(input.amount),
+    direction: input.direction as "income" | "expense",
+    account: account as "cash" | "bank",
+    category,
+    description,
+  };
+}
+
+function validDue(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 500;
+}
 
 function requireAdmin(actor: UserPublic): string | null {
   return actor.role === "admin" ? null : "Samo trener ili admin može mijenjati ove podatke.";
@@ -97,6 +123,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
     settings: { ...db.settings },
     pushSubs: db.pushSubs.map((item) => ({ ...item })),
     dailyDarts: cloneDailyDarts(db.dailyDarts),
+    treasury: normalizeTreasury(db.treasury),
   };
 
   switch (action.op) {
@@ -268,6 +295,142 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
         })),
       });
       if (next.games.length > 400) next.games = next.games.slice(-400);
+      return { db: next };
+    }
+    case "setDueAmounts": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      if (!validDue(action.renta) || !validDue(action.bank)) return { db, error: "Iznos nije ispravan." };
+      next.treasury.rentaAmount = roundEur(action.renta);
+      next.treasury.bankAmount = roundEur(action.bank);
+      return { db: next };
+    }
+    case "toggleDue": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      if (action.kind !== "renta" && action.kind !== "racun") return { db, error: "Nepoznata uplata." };
+      if (!isSeasonMonth(action.month)) return { db, error: "Nepoznat mjesec sezone." };
+      const member = next.users.find((user) => user.id === action.userId && accountStatus(user) === "active");
+      if (!member) return { db, error: "Član nije pronađen." };
+      const paid = next.treasury.dues.some((item) => item.userId === action.userId && item.month === action.month && item.kind === action.kind);
+      if (paid) {
+        next.treasury.dues = next.treasury.dues.filter((item) => !(item.userId === action.userId && item.month === action.month && item.kind === action.kind));
+        next.treasury.entries = next.treasury.entries.filter((item) => !dueEntryMatch(item, action.userId, action.month, action.kind));
+      } else {
+        const now = new Date().toISOString();
+        const label = action.kind === "renta" ? "Renta aparata" : "Uplata na račun";
+        next.treasury.dues.push({
+          userId: action.userId,
+          month: action.month,
+          kind: action.kind,
+          paidAt: now,
+          enteredById: actor.id,
+          enteredByName: actor.name,
+        });
+        next.treasury.entries.push({
+          id: uid(),
+          date: todayZagreb(),
+          amount: dueAmount(next.treasury, action.kind),
+          direction: "income",
+          account: dueAccount(action.kind),
+          category: action.kind,
+          description: `${label}, ${member.name}, ${monthLabel(action.month)}`,
+          createdById: actor.id,
+          createdByName: actor.name,
+          createdAt: now,
+          source: "dues",
+          dueUserId: action.userId,
+          dueMonth: action.month,
+          dueKind: action.kind,
+        });
+      }
+      return { db: next };
+    }
+    case "addStash": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(action.date || "")) return { db, error: "Datum nije ispravan." };
+      if (!Number.isFinite(action.amount) || action.amount <= 0 || action.amount > 100000) return { db, error: "Iznos nije ispravan." };
+      const donor = action.donorUserId ? next.users.find((user) => user.id === action.donorUserId && accountStatus(user) === "active") : undefined;
+      if (action.donorUserId && !donor) return { db, error: "Član nije pronađen." };
+      const id = action.id && PROOF_ID.test(action.id) ? action.id : uid();
+      if (next.treasury.entries.some((item) => item.id === id)) return { db, error: "Unos je već spremljen." };
+      next.treasury.entries.push({
+        id,
+        date: action.date,
+        amount: roundEur(action.amount),
+        direction: "income",
+        account: "cash",
+        category: "stash",
+        description: donor ? `Dobrovoljni stash, ${donor.name}` : "Dobrovoljni stash, anonimno",
+        createdById: actor.id,
+        createdByName: actor.name,
+        createdAt: new Date().toISOString(),
+        source: "stash",
+        donorUserId: donor?.id,
+        donorName: donor?.name,
+      });
+      return { db: next };
+    }
+    case "addLedger": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      const entry = sanitizeLedger(action.entry);
+      if (!entry) return { db, error: "Unos blagajne nije ispravan." };
+      const id = action.entry.id && PROOF_ID.test(action.entry.id) ? action.entry.id : uid();
+      if (next.treasury.entries.some((item) => item.id === id)) return { db, error: "Unos je već spremljen." };
+      next.treasury.entries.push({
+        ...entry,
+        id,
+        createdById: actor.id,
+        createdByName: actor.name,
+        createdAt: new Date().toISOString(),
+        source: "manual",
+      });
+      return { db: next };
+    }
+    case "updateLedger": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      const current = next.treasury.entries.find((item) => item.id === action.entry.id);
+      if (!current) return { db, error: "Unos nije pronađen." };
+      if (current.source === "dues" || current.source === "stash") return { db, error: "Ovaj unos mijenjaj u njegovom odjeljku." };
+      const entry = sanitizeLedger(action.entry);
+      if (!entry) return { db, error: "Unos blagajne nije ispravan." };
+      current.date = entry.date;
+      current.amount = entry.amount;
+      current.direction = entry.direction;
+      current.account = entry.account;
+      current.category = entry.category;
+      current.description = entry.description;
+      return { db: next };
+    }
+    case "deleteLedger": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      const current = next.treasury.entries.find((item) => item.id === action.id);
+      if (!current) return { db, error: "Unos nije pronađen." };
+      if (current.source === "dues" && current.dueUserId && current.dueMonth && current.dueKind) {
+        next.treasury.dues = next.treasury.dues.filter((item) => !(item.userId === current.dueUserId && item.month === current.dueMonth && item.kind === current.dueKind));
+      }
+      next.treasury.entries = next.treasury.entries.filter((item) => item.id !== action.id);
+      return { db: next };
+    }
+    case "setLedgerReceipt": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      if (!PROOF_ID.test(action.id)) return { db, error: "Nepoznat unos." };
+      const entry = next.treasury.entries.find((item) => item.id === action.id);
+      if (!entry) return { db, error: "Unos nije pronađen." };
+      if (action.hasReceipt) {
+        entry.hasReceipt = true;
+        if (!entry.receiptUserId) entry.receiptUserId = actor.id;
+        entry.receiptRev = (entry.receiptRev ?? 0) + 1;
+      } else if (entry.hasReceipt) {
+        entry.hasReceipt = false;
+        delete entry.receiptUserId;
+        entry.receiptRev = (entry.receiptRev ?? 0) + 1;
+      }
       return { db: next };
     }
     case "setGameProof": {
@@ -457,6 +620,7 @@ export function toPublic(db: Db, viewer: UserPublic | null): AppData {
     members,
     pendingRequests,
     dailyDarts: publicDailyDarts(db.dailyDarts, viewer),
+    treasury: normalizeTreasury(db.treasury),
   };
 }
 

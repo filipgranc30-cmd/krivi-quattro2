@@ -90,6 +90,7 @@ async function dumpRedis(): Promise<BackupKey[]> {
   return rows;
 }
 
+/** SCAN the whole keyspace. There is no MATCH filter, so aggregate keys and photo keys are both included. */
 async function scanKeys(): Promise<string[]> {
   const keys: string[] = [];
   let cursor = "0";

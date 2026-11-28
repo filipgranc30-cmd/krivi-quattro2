@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { BlagajnaTeaser } from "@/components/blagajna-teaser";
 import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
 import { VijestiTeaser } from "@/components/vijesti-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
@@ -135,6 +136,7 @@ export default function DashboardPage() {
         </ol>
       </Card>
 
+      <BlagajnaTeaser />
       <VijestiTeaser />
       <DailyDartsTeaser />
       <TurniriTeaser />

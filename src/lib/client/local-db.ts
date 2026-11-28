@@ -1,3 +1,4 @@
+import { clearLocalReceipts, deleteLocalReceipt, pruneLocalReceipts } from "./local-receipt";
 import { clearLocalProofs, deleteLocalProof, pruneLocalProofs } from "./local-proof";
 import { applyAction, publicUser, registerAccount, toPublic } from "../shared/mutate";
 import { emptyDb, stripDemoData } from "../shared/seed";
@@ -111,7 +112,9 @@ export function localMutate(actor: UserPublic, action: Action): { data: AppData;
   }
   write(result.db);
   if (action.op === "setGameProof" && !action.hasProof) deleteLocalProof(action.id);
+  if (action.op === "setLedgerReceipt" && !action.hasReceipt) deleteLocalReceipt(action.id);
   pruneLocalProofs(new Set(result.db.games.map((game) => game.id)));
+  pruneLocalReceipts(new Set(result.db.treasury.entries.filter((entry) => entry.hasReceipt).map((entry) => entry.id)));
   return { data: toPublic(result.db, actor) };
 }
 
@@ -119,4 +122,5 @@ export function localReset() {
   localStorage.removeItem(DB_KEY);
   localStorage.removeItem(SESSION_KEY);
   clearLocalProofs();
+  clearLocalReceipts();
 }
