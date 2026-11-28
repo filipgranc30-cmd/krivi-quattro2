@@ -14,6 +14,9 @@ import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
 import { QuickCricket } from "./quick-cricket";
 import { Quick501 } from "./quick501";
+import { HIGH_SCORE_MAX, HIGH_SCORE_ROUNDS, highScoreAverage } from "@/lib/shared/highscore";
+import { formatHr } from "@/lib/shared/training-rank";
+import { HighScoreStandings } from "./training-board";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "./ui";
 
 type Person = { key: string; name: string; userId?: string; demo?: boolean };
@@ -28,7 +31,6 @@ export function GameScreen({ type }: { type: GameType }) {
   const [mode501, setMode501] = useState<"quick" | "detail">("quick");
   const [modeCricket, setModeCricket] = useState<"quick" | "detail">("quick");
   const [bestOf501, setBestOf501] = useState(3);
-  const [rounds, setRounds] = useState(type === "marathon" ? 10 : 8);
   const selected = people.filter((person) => selection.includes(person.key));
 
   if (type === "501" && mode501 === "quick") {
@@ -46,11 +48,12 @@ export function GameScreen({ type }: { type: GameType }) {
           <p className="mt-1 text-sm text-zinc-400">
             {type === "marathon"
               ? "20 rundi po 3 strelice. Meta ide Bull, D20, D19 … D1. Pogodak odmah prebacuje na sljedeću metu. Igra staje nakon 20 rundi ili kad netko pogodi D1."
-              : type === "501" || type === "cricket"
-                ? "Detaljno bodovanje. Odaberi tko igra. Redoslijed je red bacanja."
-                : "Odaberi tko igra. Redoslijed je red bacanja."}
+              : type === "highscore"
+                ? "15 rundi po 3 strelice. Svaki igrač upisuje samo konačni zbroj, najviše 2700. Prosjek je zbroj podijeljen s 15."
+                : "Detaljno bodovanje. Odaberi tko igra. Redoslijed je red bacanja."}
           </p>
         </div>
+        {type === "highscore" && <HighScoreStandings />}
         <div className="space-y-2">
           {people.map((person) => {
             const on = selection.includes(person.key);
@@ -82,11 +85,6 @@ export function GameScreen({ type }: { type: GameType }) {
             </div>
           </Card>
         )}
-        {type === "highscore" && (
-          <Card>
-            <Stepper label="Runde" value={rounds} min={5} max={20} onChange={setRounds} />
-          </Card>
-        )}
         <PrimaryButton className="w-full" disabled={!selected.length} onClick={() => setStarted(true)}>
           Kreni
         </PrimaryButton>
@@ -102,7 +100,12 @@ export function GameScreen({ type }: { type: GameType }) {
   if (type === "501") return <Game501 players={selected} legsToWin={firstTo(bestOf501)} setsToWin={1} />;
   if (type === "cricket") return <GameCricket players={selected} />;
   if (type === "marathon") return <GameMarathon players={selected} />;
-  return <GameTotals type="highscore" players={selected} rounds={rounds} />;
+  return (
+    <div className="space-y-6">
+      <GameTotals players={selected} />
+      <HighScoreStandings />
+    </div>
+  );
 }
 
 function candidates(data: AppData, userId?: string, userName?: string): Person[] {
@@ -131,19 +134,6 @@ function defaultTrainingPick(people: Person[], userId?: string): string[] {
   const me = userId ? people.find((person) => person.userId === userId || person.key === userId) : undefined;
   if (me && !ids.includes(me.key)) ids.push(me.key);
   return ids;
-}
-
-function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
-  return (
-    <div>
-      <div className="text-xs text-zinc-400">{label}</div>
-      <div className="mt-2 flex items-center gap-2">
-        <button type="button" className="h-11 w-11 rounded-xl border border-white/15 text-xl" onClick={() => onChange(Math.max(min, value - 1))}>–</button>
-        <div className="font-display min-w-8 text-center text-2xl">{value}</div>
-        <button type="button" className="h-11 w-11 rounded-xl border border-white/15 text-xl" onClick={() => onChange(Math.min(max, value + 1))}>+</button>
-      </div>
-    </div>
-  );
 }
 
 type P501 = {
@@ -657,67 +647,60 @@ function GameMarathon({ players }: { players: Person[] }) {
   );
 }
 
-function GameTotals({ type, players, rounds }: { type: "highscore"; players: Person[]; rounds: number }) {
-  type P = { key: string; name: string; userId?: string; total: number; roundsDone: number; highest: number; c180: number; c140: number; c100: number };
-  const [list, setList] = useState<P[]>(() => players.map((person) => ({ key: person.key, name: person.name, userId: person.userId, total: 0, roundsDone: 0, highest: 0, c180: 0, c140: 0, c100: 0 })));
+function GameTotals({ players }: { players: Person[] }) {
+  type P = { key: string; name: string; userId?: string; total: number | null };
+  const [list, setList] = useState<P[]>(() => players.map((person) => ({ key: person.key, name: person.name, userId: person.userId, total: null })));
   const [turn, setTurn] = useState(0);
   const [entry, setEntry] = useState("");
   const [message, setMessage] = useState("");
-  const done = list.every((player) => player.roundsDone >= rounds);
-  const winnerIndex = done ? list.reduce((best, player, index, all) => (player.total > all[best].total ? index : best), 0) : null;
+  const done = list.every((player) => player.total != null);
+  const winnerIndex = done ? list.reduce((best, player, index, all) => ((player.total ?? -1) > (all[best].total ?? -1) ? index : best), 0) : null;
 
   const submit = () => {
+    if (!/^\d{1,4}$/.test(entry)) {
+      setMessage("Upiši zbroj od 0 do 2700.");
+      return;
+    }
     const total = Number(entry);
-    if (!Number.isInteger(total) || total < 0 || total > 180) {
-      setMessage("Upiši zbroj 0–180.");
+    if (!Number.isInteger(total) || total < 0 || total > HIGH_SCORE_MAX) {
+      setMessage("Upiši zbroj od 0 do 2700.");
       return;
     }
     const next = list.map((player) => ({ ...player }));
-    const player = next[turn];
-    player.total += total;
-    player.roundsDone += 1;
-    player.highest = Math.max(player.highest, total);
-    if (total === 180) player.c180 += 1;
-    else if (total >= 140) player.c140 += 1;
-    else if (total >= 100) player.c100 += 1;
+    next[turn].total = total;
     setList(next);
     setEntry("");
     setMessage("");
-    const order = [...next.keys()].filter((index) => next[index].roundsDone < rounds);
-    if (!order.length) return;
-    const nextTurn = order.find((index) => index > turn) ?? order[0];
-    setTurn(nextTurn);
+    const upcoming = next.findIndex((player, index) => index > turn && player.total == null);
+    const remaining = next.findIndex((player) => player.total == null);
+    if (remaining >= 0) setTurn(upcoming >= 0 ? upcoming : remaining);
   };
 
   const results: GamePlayerResult[] = list.map((player, index) => ({
     name: player.name,
     userId: player.userId,
     won: winnerIndex === index,
-    threeDartAvg: player.roundsDone ? round1(player.total / player.roundsDone) : 0,
-    totalScore: player.total,
-    highestVisit: player.highest,
-    count180: player.c180,
-    count140: player.c140,
-    count100: player.c100,
+    threeDartAvg: player.total == null ? undefined : highScoreAverage(player.total),
+    totalScore: player.total ?? undefined,
   }));
 
   return (
     <div className="space-y-4">
-      <SectionTitle>{titleOf(type)}</SectionTitle>
-      <p className="text-sm text-zinc-400">{rounds} rundi po tri strelice. Najveći zbroj pobjeđuje. Prosjek je zbroj podijeljen s brojem rundi.</p>
+      <SectionTitle>HIGH SCORE</SectionTitle>
+      <p className="text-sm text-zinc-400">{HIGH_SCORE_ROUNDS} rundi po tri strelice. Upiši konačni zbroj svakog igrača. Prosjek je zbroj podijeljen s {HIGH_SCORE_ROUNDS}.</p>
       {list.map((player, index) => (
         <div key={player.key} className={`rounded-xl border p-3 ${!done && index === turn ? "border-orange-500" : "border-white/10"}`}>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span>{player.name}</span>
-            <span className="text-zinc-400">{player.roundsDone}/{rounds}</span>
+            <span className="text-zinc-400">{player.total == null ? "čeka" : "uneseno"}</span>
           </div>
-          <div className="font-display text-4xl">{player.total}</div>
-          <div className="text-xs text-zinc-500">prosjek {player.roundsDone ? (player.total / player.roundsDone).toFixed(1) : "0"}</div>
+          <div className="font-display text-4xl">{player.total ?? "–"}</div>
+          <div className="text-xs text-zinc-500">prosjek {player.total == null ? "–" : formatHr(highScoreAverage(player.total), 2)}</div>
         </div>
       ))}
       {!done && (
         <Card>
-          <div className="text-sm text-orange-300">{list[turn]?.name} · runda {list[turn].roundsDone + 1}</div>
+          <div className="text-sm text-orange-300">{list[turn]?.name} · konačni zbroj</div>
           <div className="font-display mt-2 text-center text-5xl">{entry || "0"}</div>
           {message && <div className="mt-1 text-sm text-red-300">{message}</div>}
           <div className="mt-3 grid grid-cols-3 gap-2">
@@ -729,7 +712,7 @@ function GameTotals({ type, players, rounds }: { type: "highscore"; players: Per
                 onClick={() => {
                   if (key === "C") setEntry("");
                   else if (key === "OK") submit();
-                  else setEntry((value) => (value + key).replace(/^0+(?=\d)/, "").slice(0, 3));
+                  else setEntry((value) => (value + key).replace(/^0+(?=\d)/, "").slice(0, 4));
                 }}
               >
                 {key === "OK" ? "Upiši" : key === "C" ? "Briši" : key}
@@ -738,7 +721,7 @@ function GameTotals({ type, players, rounds }: { type: "highscore"; players: Per
           </div>
         </Card>
       )}
-      {done && winnerIndex != null && <ResultBox type={type} summary={`${list[winnerIndex].name} ima najveći zbroj`} players={results} />}
+      {done && winnerIndex != null && <ResultBox type="highscore" summary={`${list[winnerIndex].name} ima najveći zbroj`} players={results} />}
     </div>
   );
 }

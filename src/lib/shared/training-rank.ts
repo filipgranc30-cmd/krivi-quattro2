@@ -1,3 +1,4 @@
+import { HIGH_SCORE_ROUNDS } from "./highscore";
 import type { GamePlayerResult, SavedGame } from "./types";
 import { normName } from "./util";
 
@@ -351,8 +352,9 @@ function boardHighScore(players: TrainingPlayer[], games: SavedGame[]): Training
     games,
     "highscore",
     (player, row) => {
-      if (player.threeDartAvg) {
-        row.avgSum += player.threeDartAvg;
+      const average = player.threeDartAvg != null ? player.threeDartAvg : player.totalScore != null ? player.totalScore / HIGH_SCORE_ROUNDS : null;
+      if (average != null) {
+        row.avgSum += average;
         row.avgN += 1;
       }
       row.bestVisit = Math.max(row.bestVisit, player.highestVisit || 0);
@@ -439,7 +441,7 @@ function averageLine(game: SavedGame): string {
       .map((player) => `${player.totalScore ?? 0} pog.${player.marathonPoints != null ? ` / ${player.marathonPoints} bod` : ""}`)
       .join(" · ");
   }
-  return game.players.map((player) => (player.threeDartAvg != null ? formatHr(player.threeDartAvg, 2) : DASH)).join(" · ");
+  return game.players.map((player) => (player.totalScore != null ? String(player.totalScore) : DASH)).join(" · ");
 }
 
 function detailLines(type: SavedGame["type"], player: GamePlayerResult): MatchDetailLine[] {
@@ -465,7 +467,8 @@ function detailLines(type: SavedGame["type"], player: GamePlayerResult): MatchDe
     if (player.totalScore != null) lines.push({ label: "Pogoci", value: String(player.totalScore) });
     if (player.marathonPoints != null) lines.push({ label: "Bodovi", value: String(player.marathonPoints) });
   } else {
-    if (player.threeDartAvg != null) lines.push({ label: "Prosjek", value: formatHr(player.threeDartAvg, 2) });
+    const average = player.threeDartAvg != null ? player.threeDartAvg : player.totalScore != null ? player.totalScore / HIGH_SCORE_ROUNDS : null;
+    if (average != null) lines.push({ label: "Prosjek", value: formatHr(average, 2) });
     if (player.totalScore != null) lines.push({ label: "Zbroj", value: String(player.totalScore) });
     if (player.highestVisit) lines.push({ label: "Najveći posjet", value: String(player.highestVisit) });
   }
