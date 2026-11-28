@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { LaunchSplash } from "@/components/launch-splash";
 import { localData, localLogin, localLogout, localMutate, localRegister, localReset, localSessionUser } from "@/lib/client/local-db";
 import { toPublic } from "@/lib/shared/mutate";
 import { emptyDb } from "@/lib/shared/seed";
@@ -284,6 +285,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={value}>
       <Gate>{children}</Gate>
+      <LaunchSplash />
     </AppContext.Provider>
   );
 }
@@ -339,9 +341,9 @@ function PendingScreen() {
 
 function Splash() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-      <img src="/logo.jpg" alt="Krivi Quattro" className="h-28 w-28 rounded-full object-cover" />
-      <div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 text-center">
+      <img src="/logo.png" alt="Krivi Quattro" className="h-auto w-[92vw] max-w-[440px]" />
+      <div className="-mt-1">
         <div className="font-display text-3xl font-bold tracking-wide">KRIVI QUATTRO</div>
         <div className="text-xs tracking-[0.28em] text-orange-400">DARTS CLUB</div>
       </div>
