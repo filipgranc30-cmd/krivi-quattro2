@@ -7,7 +7,7 @@ import { Card, PrimaryButton, SectionTitle } from "@/components/ui";
 import { prepareProofImage } from "@/lib/client/proof-image";
 import { localReceiptUrl } from "@/lib/client/local-receipt";
 import { saveLedgerReceipt } from "@/lib/client/receipt-api";
-import { categoryLabel, duesStatus, formatEur, isLedgerCategory, LEDGER_CATEGORIES, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
+import { categoryLabel, formatEur, isLedgerCategory, LEDGER_CATEGORIES, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
 import { todayZagreb } from "@/lib/shared/dates";
 import type { DueKind, LedgerCategory, LedgerEntry, MoneyAccount } from "@/lib/shared/types";
 import { uid } from "@/lib/shared/util";
@@ -17,8 +17,6 @@ export default function TreasuryPage() {
   const admin = user?.role === "admin";
   const today = todayZagreb();
   const balance = treasuryBalance(data.treasury);
-  const rows = duesStatus(data.treasury, data.members, today.slice(0, 7));
-  const owed = rows.filter((row) => row.amount > 0);
   const [rentaInput, setRentaInput] = useState(String(data.treasury.rentaAmount));
   const [bankInput, setBankInput] = useState(String(data.treasury.bankAmount));
   const [note, setNote] = useState("");
@@ -156,16 +154,6 @@ export default function TreasuryPage() {
               })}
             </tbody>
           </table>
-        </div>
-        <div className="mt-3 space-y-1 text-sm">
-          {owed.length === 0 && <p className="text-zinc-400">Nitko ne duguje do ovog mjeseca.</p>}
-          {owed.map((row) => (
-            <p key={row.userId} className={row.userId === user?.id ? "text-orange-200" : "text-zinc-300"}>
-              {row.name}: {formatEur(row.amount)}
-              {row.renta > 0 ? ` · renta ${formatEur(row.renta)} (${row.rentaUnpaid.map(monthLabel).join(", ")})` : ""}
-              {row.bank > 0 ? ` · račun ${formatEur(row.bank)} (${row.racunUnpaid.map(monthLabel).join(", ")})` : ""}
-            </p>
-          ))}
         </div>
       </Card>
       <Card>
