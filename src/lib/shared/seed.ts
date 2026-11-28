@@ -1,4 +1,5 @@
 import { emptyTreasury } from "./blagajna";
+import { emptyElo } from "./elo";
 import { defaultDailyDarts } from "./daily-darts";
 import { CLUB_NAME, DEFAULT_TRAINING_TIME, HOME_VENUE } from "./club";
 import type { Db, RosterPlayer, Settings } from "./types";
@@ -70,6 +71,7 @@ export function emptyDb(): Db {
     pushSubs: [],
     dailyDarts: defaultDailyDarts(),
     treasury: emptyTreasury(),
+    elo: emptyElo(),
   };
 }
 

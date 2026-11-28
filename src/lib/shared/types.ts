@@ -126,6 +126,10 @@ export type SavedGame = {
   hasProof?: boolean;
   proofUserId?: string;
   proofRev?: number;
+  /** This training game is part of the current ELO table. */
+  eloCounted?: boolean;
+  /** Admin removed this training game from ELO. */
+  eloExclude?: boolean;
 };
 
 export type Settings = {
@@ -274,6 +278,32 @@ export type LedgerEntry = {
   donorName?: string;
 };
 
+export type EloChallengeStatus = "pending" | "accepted" | "declined" | "reported" | "confirmed" | "void";
+
+export type EloChallenge = {
+  id: string;
+  createdAt: string;
+  challengerId: string;
+  challengerName: string;
+  opponentId: string;
+  opponentName: string;
+  format: string;
+  date: string;
+  status: EloChallengeStatus;
+  legsChallenger?: number;
+  legsOpponent?: number;
+  reportedById?: string;
+  reportedAt?: string;
+  confirmedById?: string;
+  confirmedAt?: string;
+};
+
+export type EloState = {
+  startRating: number;
+  trainingCounts: boolean;
+  challenges: EloChallenge[];
+};
+
 export type Treasury = {
   rentaAmount: number;
   bankAmount: number;
@@ -294,6 +324,7 @@ export type AppData = {
   pendingRequests: Member[];
   dailyDarts: PublicDailyDarts;
   treasury: Treasury;
+  elo: EloState;
 };
 
 export type StoredUser = UserPublic & { passwordHash: string; honorary?: boolean };
@@ -317,6 +348,7 @@ export type Db = {
   pushSubs: PushSub[];
   dailyDarts: DailyDartsState;
   treasury: Treasury;
+  elo: EloState;
 };
 
 export type Action =
@@ -361,7 +393,14 @@ export type Action =
   | { op: "dailySetStats"; matchId: string; rows: Omit<DailyDartsStat, "matchId">[] }
   | { op: "dailySetPicks"; dayId: string; playerIds: string[] }
   | { op: "dailySetScoring"; scoring: DailyDartsScoring }
-  | { op: "dailySetTournament"; tournamentId: string };
+  | { op: "dailySetTournament"; tournamentId: string }
+  | { op: "eloChallenge"; opponentId: string; format: string; date: string }
+  | { op: "eloRespond"; id: string; accept: boolean }
+  | { op: "eloReport"; id: string; myLegs: number; theirLegs: number }
+  | { op: "eloConfirm"; id: string }
+  | { op: "eloVoid"; id: string; source: "challenge" | "training" }
+  | { op: "eloRecompute" }
+  | { op: "eloSettings"; startRating: number; trainingCounts: boolean };
 
 export type LeagueInfo = { id: number; name: string; group: string };
 

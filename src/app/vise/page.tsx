@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { BackupPanel } from "@/components/backup-panel";
 import { MemberName } from "@/components/member-name";
 import { Card, Field, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
 import { isTreasurer } from "@/lib/shared/blagajna";
+import { buildClubElo } from "@/lib/shared/elo";
 import { formatWhen } from "@/lib/shared/dates";
 
 export default function MorePage() {
@@ -19,6 +20,10 @@ export default function MorePage() {
   const [venue, setVenue] = useState(data.settings.venue);
   const admin = user?.role === "admin";
   const treasurer = isTreasurer(user);
+  const myElo = useMemo(
+    () => buildClubElo({ games: data.games, elo: data.elo, members: data.members }).standings.find((row) => row.userId === user?.id),
+    [data.games, data.elo, data.members, user?.id],
+  );
 
   return (
     <div className="space-y-4">
@@ -27,6 +32,12 @@ export default function MorePage() {
         <div className="font-display text-2xl">{user?.name ? <MemberName name={user.name} /> : ""}</div>
         <div className="text-sm text-zinc-400">{user?.email}</div>
         <div className="mt-1 text-sm text-orange-300">{user?.role === "admin" ? "Admin / trener" : "Član"}</div>
+        {myElo && (
+          <Link href={`/elo/${myElo.userId}`} className="mt-2 block text-sm text-zinc-200">
+            ELO <span className="font-display text-xl text-orange-300">{myElo.rating}</span>
+            <span className="ml-2 text-xs text-zinc-500">{myElo.wins}-{myElo.losses}</span>
+          </Link>
+        )}
         <GhostButton className="mt-3 w-full" onClick={() => logout()}>Odjava</GhostButton>
       </Card>
       <Link href="/blagajna" className="block rounded-2xl border border-orange-500/40 bg-[#141418] p-4">
