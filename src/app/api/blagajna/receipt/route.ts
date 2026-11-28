@@ -3,6 +3,7 @@ import { deleteReceipt, putReceipt } from "@/lib/server/receipt-store";
 import { isSharedMode } from "@/lib/server/redis";
 import { updateDb } from "@/lib/server/store";
 import { applyAction, publicUser, toPublic } from "@/lib/shared/mutate";
+import { isTreasurer } from "@/lib/shared/blagajna";
 import { decodeProofJpeg, PROOF_ID } from "@/lib/shared/proof";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,6 @@ async function requireAdmin() {
   if (!actor) return Response.json({ ok: false, error: "Nisi prijavljen." }, { status: 401, headers: noStore });
   const blocked = pendingBlock(actor);
   if (blocked) return blocked;
-  if (actor.role !== "admin") return Response.json({ ok: false, error: "Samo admin može mijenjati blagajnu." }, { status: 403, headers: noStore });
+  if (!isTreasurer(actor)) return Response.json({ ok: false, error: "Samo Filip može mijenjati blagajnu." }, { status: 403, headers: noStore });
   return actor;
 }
