@@ -1,4 +1,5 @@
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
+import { PROOF_ID } from "./proof";
 import type { Action, AppData, Db, Member, NotificationItem, StoredUser, UserPublic } from "./types";
 import { accountStatus } from "./types";
 import { clampText, firstName, normName, uid } from "./util";
@@ -254,8 +255,10 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
     case "saveGame": {
       const players = (action.game.players || []).filter((player) => clampText(player.name, 80));
       if (!players.length) return { db, error: "Igra nema igrače." };
+      const requested = action.game.id && PROOF_ID.test(action.game.id) ? action.game.id : uid();
+      if (next.games.some((item) => item.id === requested)) return { db, error: "Igra je već spremljena." };
       next.games.push({
-        id: uid(),
+        id: requested,
         type: action.game.type,
         playedAt: action.game.playedAt || new Date().toISOString(),
         summary: clampText(action.game.summary || "", 180),
@@ -265,6 +268,28 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
         })),
       });
       if (next.games.length > 400) next.games = next.games.slice(-400);
+      return { db: next };
+    }
+    case "setGameProof": {
+      if (!PROOF_ID.test(action.id)) return { db, error: "Nepoznat rezultat." };
+      const game = next.games.find((item) => item.id === action.id);
+      if (!game || game.type !== "highscore") return { db, error: "Rezultat nije pronađen." };
+      const owns = !game.proofUserId || game.proofUserId === actor.id;
+      if (action.hasProof) {
+        if (game.hasProof && !owns && actor.role !== "admin") {
+          return { db, error: "Samo autor slike ili admin može zamijeniti dokaz." };
+        }
+        game.hasProof = true;
+        if (!game.proofUserId) game.proofUserId = actor.id;
+        game.proofRev = (game.proofRev ?? 0) + 1;
+      } else if (game.hasProof) {
+        if (!owns && actor.role !== "admin") {
+          return { db, error: "Samo autor slike ili admin može obrisati dokaz." };
+        }
+        game.hasProof = false;
+        delete game.proofUserId;
+        game.proofRev = (game.proofRev ?? 0) + 1;
+      }
       return { db: next };
     }
     case "deleteGame": {

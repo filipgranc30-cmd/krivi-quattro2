@@ -5,11 +5,14 @@ export type TrainingPlayer = { name: string; userId?: string };
 
 export type RankColumn = { label: string; hint: string };
 
+export type ScoreProof = { id: string; rev: number; userId?: string };
+
 export type RankedRow = {
   rank: number;
   name: string;
   userId?: string;
   values: string[];
+  proof?: ScoreProof;
 };
 
 export type MatchDetailLine = { label: string; value: string };
@@ -21,6 +24,9 @@ export type MatchCard = {
   players: string;
   averages: string;
   playersDetail: { name: string; won: boolean; lines: MatchDetailLine[] }[];
+  hasProof?: boolean;
+  proofRev?: number;
+  proofUserId?: string;
 };
 
 export type TrainingBoard = {
@@ -379,9 +385,20 @@ function boardHighScore(players: TrainingPlayer[], games: SavedGame[]): Training
         { kind: "int" },
         { kind: "int" },
       ]),
+      proof: proofFor(games, row.name, row.userId),
     })),
     matches: games.filter((game) => game.type === "highscore").map(matchCard),
   };
+}
+
+function proofFor(games: SavedGame[], name: string, userId?: string): ScoreProof | undefined {
+  for (const game of games) {
+    if (game.type !== "highscore" || !game.hasProof) continue;
+    const plays = game.players.some((player) => (userId && player.userId === userId) || normName(player.name) === normName(name));
+    if (!plays) continue;
+    return { id: game.id, rev: game.proofRev ?? 0, userId: game.proofUserId };
+  }
+  return undefined;
 }
 
 function matchCard(game: SavedGame): MatchCard {
@@ -398,6 +415,9 @@ function matchCard(game: SavedGame): MatchCard {
       won: player.won,
       lines: detailLines(game.type, player),
     })),
+    hasProof: Boolean(game.hasProof),
+    proofRev: game.proofRev ?? 0,
+    proofUserId: game.proofUserId,
   };
 }
 
