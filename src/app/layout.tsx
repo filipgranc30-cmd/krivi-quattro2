@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   applicationName: "Krivi Quattro",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Krivi Quattro", statusBarStyle: "black-translucent" },
+  other: { "apple-mobile-web-app-capable": "yes" },
   icons: {
     icon: [
       { url: "/favicon.ico" },
