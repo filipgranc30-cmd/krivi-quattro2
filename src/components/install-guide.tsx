@@ -112,6 +112,10 @@ function AndroidSection() {
   return (
     <section className="mt-8">
       <h2 className="font-display text-2xl tracking-wide text-orange-300">Android</h2>
+      <p className="mt-2 text-sm text-zinc-400">Verzija 1.2.0</p>
+      <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm leading-relaxed text-amber-50">
+        Ako već imaš staru aplikaciju, prvo je obriši (deinstaliraj), pa instaliraj novu. Podaci se ne gube, sve je na serveru.
+      </p>
       <a href="/krivi-quattro.apk" className="mt-4 flex h-14 items-center justify-center rounded-xl bg-orange-500 text-lg font-bold text-black">
         Preuzmi APK
       </a>

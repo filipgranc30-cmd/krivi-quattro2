@@ -97,9 +97,11 @@ def main() -> None:
         # 66/108 keeps the crest inside the adaptive-icon safe zone.
         save(fit(crest, (size, size), 66 / 108), res / folder / "ic_launcher_foreground.png")
 
+    # Keep the whole crest, plume included, inside the Android 12 circular splash mask.
     for folder, size in {**SPLASH_PORT, **SPLASH_LAND}.items():
-        save(fit(crest, size, 0.46), res / folder / "splash.png")
-    save(fit(crest, (480, 800), 0.46), res / "drawable" / "splash.png")
+        save(fit(crest, size, 0.58), res / folder / "splash.png")
+    save(fit(crest, (480, 800), 0.58), res / "drawable" / "splash.png")
+    save(fit(crest, (432, 432), 0.62), res / "drawable" / "splash_icon.png")
 
     anydpi = res / "mipmap-anydpi-v26"
     anydpi.mkdir(parents=True, exist_ok=True)

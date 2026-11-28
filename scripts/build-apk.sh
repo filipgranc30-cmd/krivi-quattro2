@@ -91,6 +91,25 @@ npx cap sync android
 
 python3 "$ROOT/scripts/android-icons.py" "$work/android/app/src/main/res" "$ROOT/public/icons/icon-512.png"
 
+python3 - "$work/android/app/src/main/res/values/styles.xml" << 'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+needle = '<item name="android:background">@drawable/splash</item>'
+insert = """<item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">#000000</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="windowSplashScreenIconBackgroundColor">#000000</item>
+        <item name="android:windowSplashScreenBackground">#000000</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>"""
+if needle not in text:
+    raise SystemExit("Launch splash style was not found in " + str(path))
+if "splash_icon" not in text:
+    text = text.replace(needle, insert, 1)
+    path.write_text(text)
+print(path)
+PY
+
 gradle_file="$work/android/app/build.gradle"
 python3 - "$gradle_file" << 'PY'
 import pathlib, re, sys
@@ -131,6 +150,6 @@ fi
   --key-pass env:ANDROID_KEY_PASSWORD \
   --out "$OUT" \
   "$aligned"
-"$build_tools/apksigner" verify --verbose "$OUT"
+"$build_tools/apksigner" verify --verbose --print-certs "$OUT"
 rm -f "$OUT.idsig"
 echo "Signed APK: $OUT ($(wc -c < "$OUT") bytes)"
