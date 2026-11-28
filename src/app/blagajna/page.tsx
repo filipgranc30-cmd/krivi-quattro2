@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Card, SectionTitle } from "@/components/ui";
 import { formatEur, formatIban, isTreasurer, lastBalanceUpdate, monthLabel, plainIban, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
-import { formatDateHr } from "@/lib/shared/dates";
 import type { DueKind } from "@/lib/shared/types";
 
 export default function TreasuryPage() {
@@ -37,22 +36,12 @@ export default function TreasuryPage() {
         <SectionTitle>KLUBSKA BLAGAJNA</SectionTitle>
         <p className="mt-1 text-sm text-zinc-400">Sezona 2026/27. Gotovina se upisuje ručno. Aparati su zbroj plaćene rente. Uplate na račun udruge idu na žiro, a početno stanje računa može se upisati.</p>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 items-stretch gap-2">
         <BalanceCard label="Gotovina" value={balance.cash} tone="text-orange-300" updated={lastBalanceUpdate(data.treasury.entries, "cash")} editable={treasurer} onSave={(amount) => act({ op: "setBalance", account: "cash", amount })} />
-        <Card className="p-3">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500">Aparati</div>
-          <div className="font-display text-xl text-orange-300">{formatEur(balance.aparati)}</div>
-        </Card>
-        <BalanceCard
-          label="Račun udruge"
-          value={balance.bank}
-          tone=""
-          updated={lastBalanceUpdate(data.treasury.entries, "bank")}
-          editable={treasurer}
-          onSave={(amount) => act({ op: "setBalance", account: "bank", amount })}
-          footer={<IbanLine iban={data.treasury.iban} editable={treasurer} onSave={(iban) => act({ op: "setIban", iban })} onCopied={() => { setToast("Kopirano"); window.setTimeout(() => setToast(""), 1600); }} />}
-        />
+        <BalanceCard label="Aparati" value={balance.aparati} tone="text-orange-300" editable={false} />
+        <BalanceCard label="Račun udruge" value={balance.bank} tone="" updated={lastBalanceUpdate(data.treasury.entries, "bank")} editable={treasurer} onSave={(amount) => act({ op: "setBalance", account: "bank", amount })} />
       </div>
+      <IbanCard iban={data.treasury.iban} editable={treasurer} onSave={(iban) => act({ op: "setIban", iban })} onCopied={() => { setToast("Kopirano"); window.setTimeout(() => setToast(""), 1600); }} />
       <Card>
         <SectionTitle>MJESEČNE UPLATE</SectionTitle>
         <p className="mt-1 text-xs text-zinc-500">Narančasto A je renta aparata ({formatEur(data.treasury.rentaAmount)}). Plavo U je uplata na račun ({formatEur(data.treasury.bankAmount)}).</p>
@@ -109,22 +98,20 @@ function BalanceCard({
   updated,
   editable,
   onSave,
-  footer,
 }: {
   label: string;
   value: number;
   tone: string;
   updated?: { date: string; createdByName: string };
   editable: boolean;
-  onSave: (amount: number) => Promise<string | null>;
-  footer?: ReactNode;
+  onSave?: (amount: number) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const save = async () => {
     const amount = Number(input.replace(",", "."));
-    const message = await onSave(amount);
+    const message = onSave ? await onSave(amount) : "Spremanje nije uspjelo.";
     if (message) {
       setError(message);
       return;
@@ -133,7 +120,7 @@ function BalanceCard({
     setError("");
   };
   return (
-    <Card className="p-3">
+    <Card className="flex h-full flex-col p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
       </div>
@@ -155,13 +142,12 @@ function BalanceCard({
           <div className={`font-display text-xl ${tone}`}>{formatEur(value)}</div>
         )
       )}
-      {updated && <p className="mt-1 text-[11px] text-zinc-500">zadnje ažuriranje: {formatDateHr(updated.date)}, {updated.createdByName}</p>}
-      {footer}
+      <p className="mt-1 min-h-4 truncate text-[10px] leading-4 text-zinc-500">{updated ? shortUpdate(updated) : ""}</p>
     </Card>
   );
 }
 
-function IbanLine({ iban, editable, onSave, onCopied }: { iban: string; editable: boolean; onSave: (iban: string) => Promise<string | null>; onCopied: () => void }) {
+function IbanCard({ iban, editable, onSave, onCopied }: { iban: string; editable: boolean; onSave: (iban: string) => Promise<string | null>; onCopied: () => void }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState(iban);
   const [error, setError] = useState("");
@@ -193,11 +179,12 @@ function IbanLine({ iban, editable, onSave, onCopied }: { iban: string; editable
     setError("");
   };
   return (
-    <div className="mt-2">
-      <div className="break-all font-mono text-[11px] leading-snug tracking-wide text-zinc-200">{formatIban(iban)}</div>
-      <div className="mt-1 flex flex-wrap gap-2">
-        <button type="button" data-copy-iban onClick={() => void copy()} className="text-[11px] font-semibold text-orange-300">Kopiraj</button>
-        {editable && !open && <button type="button" onClick={() => { setInput(formatIban(iban)); setOpen(true); }} className="text-[11px] font-semibold text-zinc-300">Uredi IBAN</button>}
+    <Card>
+      <SectionTitle>IBAN UDRUGE</SectionTitle>
+      <div className="mt-2 flex items-center gap-3">
+        <div className="min-w-0 flex-1 truncate font-mono text-sm tracking-wide text-zinc-100">{formatIban(iban)}</div>
+        <button type="button" data-copy-iban onClick={() => void copy()} className="shrink-0 text-sm font-semibold text-orange-300">Kopiraj</button>
+        {editable && !open && <button type="button" onClick={() => { setInput(formatIban(iban)); setOpen(true); }} className="shrink-0 text-sm font-semibold text-zinc-300">Uredi</button>}
       </div>
       {open && (
         <div className="mt-2 space-y-2">
@@ -206,8 +193,14 @@ function IbanLine({ iban, editable, onSave, onCopied }: { iban: string; editable
           <button type="button" onClick={() => void save()} className="h-8 rounded-lg bg-orange-500 px-3 text-xs font-bold text-black">Spremi</button>
         </div>
       )}
-    </div>
+    </Card>
   );
+}
+
+function shortUpdate(updated: { date: string; createdByName: string }): string {
+  const [, month, day] = updated.date.split("-");
+  const name = updated.createdByName.trim().split(/\s+/)[0] || updated.createdByName;
+  return `${Number(day)}.${Number(month)}. · ${name}`;
 }
 
 function DueMark({ kind, interactive, busy, payment, onToggle }: { kind: DueKind; interactive: boolean; busy: boolean; payment?: { paidAt: string; enteredByName: string }; onToggle: () => void }) {
