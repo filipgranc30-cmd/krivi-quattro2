@@ -22,3 +22,8 @@ yarn-error.log*
 next-env.d.ts
 android/
 .capacitor/
+signing/
+*.jks
+*.p12
+*.keystore
+keystore.properties

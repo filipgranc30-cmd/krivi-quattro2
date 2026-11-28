@@ -89,7 +89,7 @@ Stupac **Bod** na PSGZ-u je njihov bodovni prosjek, uz postotak pobjeda. To nije
 
 **PWA:** Chrome → izbornik → Instaliraj aplikaciju / Dodaj na početni zaslon.
 
-**APK:** workflow `.github/workflows/android-apk.yml` (Capacitor WebView prema `https://krivi-quattro2.vercel.app`). Artefakt se zove `krivi-quattro-apk`. To nije trgovina Play, nego datoteka za ručnu instalaciju. Telefon mora dozvoliti instalaciju iz nepoznatih izvora.
+**APK:** workflow `.github/workflows/android-apk.yml` (Capacitor WebView prema `https://krivi-quattro2.vercel.app`). Potpis koristi GitHub tajne `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` i `ANDROID_KEY_ALIAS`. Ključ nije u repozitoriju. Bez tih tajni job i dalje složi nepotpisanu datoteku. Potpisani artefakt `krivi-quattro-apk` se šalje s `main` i s ručnog pokretanja. To nije trgovina Play, nego datoteka za ručnu instalaciju. Telefon mora dozvoliti instalaciju iz nepoznatih izvora.
 
 ## Lokalno
 
