@@ -7,8 +7,8 @@ import { Card, PrimaryButton, SectionTitle } from "@/components/ui";
 import { prepareProofImage } from "@/lib/client/proof-image";
 import { localReceiptUrl } from "@/lib/client/local-receipt";
 import { saveLedgerReceipt } from "@/lib/client/receipt-api";
-import { categoryLabel, formatEur, isLedgerCategory, LEDGER_CATEGORIES, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
-import { todayZagreb } from "@/lib/shared/dates";
+import { categoryLabel, formatEur, isLedgerCategory, lastBalanceUpdate, LEDGER_CATEGORIES, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
+import { formatDateHr, todayZagreb } from "@/lib/shared/dates";
 import type { DueKind, LedgerCategory, LedgerEntry, MoneyAccount } from "@/lib/shared/types";
 import { uid } from "@/lib/shared/util";
 
@@ -97,8 +97,8 @@ export default function TreasuryPage() {
         <p className="mt-1 text-sm text-zinc-400">Sezona 2026/27. Renta aparata ide u gotovinu, uplata na račun udruge na žiro. Članovi vide stanje i cijelu tablicu.</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Card className="p-3"><div className="text-[10px] uppercase tracking-wider text-zinc-500">Gotovina</div><div className="font-display text-xl text-orange-300">{formatEur(balance.cash)}</div></Card>
-        <Card className="p-3"><div className="text-[10px] uppercase tracking-wider text-zinc-500">Račun udruge</div><div className="font-display text-xl">{formatEur(balance.bank)}</div></Card>
+        <BalanceCard label="Gotovina" value={balance.cash} tone="text-orange-300" updated={lastBalanceUpdate(data.treasury.entries, "cash")} admin={admin} onSave={(amount) => act({ op: "setBalance", account: "cash", amount })} />
+        <BalanceCard label="Račun udruge" value={balance.bank} tone="" updated={lastBalanceUpdate(data.treasury.entries, "bank")} admin={admin} onSave={(amount) => act({ op: "setBalance", account: "bank", amount })} />
       </div>
       <Card>
         <SectionTitle>PO MJESECU</SectionTitle>
@@ -202,7 +202,7 @@ export default function TreasuryPage() {
               </select>
             </div>
             <select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as LedgerCategory })} className="h-11 w-full rounded-xl border border-white/15 bg-black px-2 text-sm">
-              {LEDGER_CATEGORIES.filter((item) => item.id !== "stash").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {LEDGER_CATEGORIES.filter((item) => item.id !== "stash" && item.id !== "korekcija").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
             <input value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Opis" className="h-11 w-full rounded-xl border border-white/15 bg-black px-3 text-sm" />
             <label className="flex h-11 items-center justify-center rounded-xl border border-orange-500/40 text-sm font-bold text-orange-200">
@@ -227,19 +227,74 @@ export default function TreasuryPage() {
                 </div>
               </div>
               {entry.hasReceipt && <ReceiptLink id={entry.id} rev={entry.receiptRev} />}
-              {admin && entry.source !== "dues" && (
+              {admin && entry.source !== "dues" && entry.source !== "balance" && (
                 <div className="mt-2 flex gap-2">
                   <button type="button" className="text-xs font-semibold text-orange-300" onClick={() => setDraft({ id: entry.id, date: entry.date, amount: String(entry.amount), direction: entry.direction, account: entry.account, category: entry.category, description: entry.description })}>Uredi</button>
                   <button type="button" className="text-xs font-semibold text-red-300" onClick={() => void remove(entry)}>Obriši</button>
                 </div>
               )}
-              {admin && entry.source === "dues" && <button type="button" className="mt-2 text-xs font-semibold text-red-300" onClick={() => void remove(entry)}>Obriši</button>}
+              {admin && (entry.source === "dues" || entry.source === "balance") && <button type="button" className="mt-2 text-xs font-semibold text-red-300" onClick={() => void remove(entry)}>Obriši</button>}
             </li>
           ))}
           {data.treasury.entries.filter((entry) => entry.category !== "stash").length === 0 && <li className="text-sm text-zinc-500">Još nema unosa.</li>}
         </ul>
       </Card>
     </div>
+  );
+}
+
+function BalanceCard({
+  label,
+  value,
+  tone,
+  updated,
+  admin,
+  onSave,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+  updated?: { date: string; createdByName: string };
+  admin: boolean;
+  onSave: (amount: number) => Promise<string | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
+  const save = async () => {
+    const amount = Number(input.replace(",", "."));
+    const message = await onSave(amount);
+    if (message) {
+      setError(message);
+      return;
+    }
+    setOpen(false);
+    setError("");
+  };
+  return (
+    <Card className="p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
+        {admin && !open && (
+          <button type="button" className="text-[11px] font-semibold text-orange-300" onClick={() => { setInput(String(value).replace(".", ",")); setOpen(true); }}>
+            Uredi
+          </button>
+        )}
+      </div>
+      {open ? (
+        <div className="mt-2 space-y-2">
+          <input value={input} onChange={(event) => setInput(event.target.value)} inputMode="decimal" aria-label={label} className="h-10 w-full rounded-xl border border-white/15 bg-black px-2 text-sm" />
+          {error && <p className="text-xs text-red-300">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void save()} className="h-9 flex-1 rounded-lg bg-orange-500 text-xs font-bold text-black">Spremi</button>
+            <button type="button" onClick={() => { setOpen(false); setError(""); }} className="h-9 flex-1 rounded-lg border border-white/15 text-xs font-bold">Odustani</button>
+          </div>
+        </div>
+      ) : (
+        <div className={`font-display text-xl ${tone}`}>{formatEur(value)}</div>
+      )}
+      {updated && <p className="mt-1 text-[11px] text-zinc-500">zadnje ažuriranje: {formatDateHr(updated.date)}, {updated.createdByName}</p>}
+    </Card>
   );
 }
 

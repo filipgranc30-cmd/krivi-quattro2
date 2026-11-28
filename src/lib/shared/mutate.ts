@@ -1,4 +1,4 @@
-import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, monthLabel, normalizeTreasury, roundEur } from "./blagajna";
+import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, monthLabel, normalizeTreasury, roundEur, treasuryBalance } from "./blagajna";
 import { todayZagreb } from "./dates";
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import { PROOF_ID } from "./proof";
@@ -372,6 +372,30 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       });
       return { db: next };
     }
+    case "setBalance": {
+      const denied = requireAdmin(actor);
+      if (denied) return { db, error: denied };
+      if (action.account !== "cash" && action.account !== "bank") return { db, error: "Nepoznat račun." };
+      if (!Number.isFinite(action.amount) || Math.abs(action.amount) > 1000000) return { db, error: "Iznos nije ispravan." };
+      const target = roundEur(action.amount);
+      const current = action.account === "cash" ? treasuryBalance(next.treasury).cash : treasuryBalance(next.treasury).bank;
+      const delta = roundEur(target - current);
+      const now = new Date().toISOString();
+      next.treasury.entries.push({
+        id: uid(),
+        date: todayZagreb(),
+        amount: Math.abs(delta),
+        direction: delta < 0 ? "expense" : "income",
+        account: action.account,
+        category: "korekcija",
+        description: action.account === "cash" ? "Usklađenje gotovine" : "Usklađenje računa udruge",
+        createdById: actor.id,
+        createdByName: actor.name,
+        createdAt: now,
+        source: "balance",
+      });
+      return { db: next };
+    }
     case "addLedger": {
       const denied = requireAdmin(actor);
       if (denied) return { db, error: denied };
@@ -394,7 +418,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       if (denied) return { db, error: denied };
       const current = next.treasury.entries.find((item) => item.id === action.entry.id);
       if (!current) return { db, error: "Unos nije pronađen." };
-      if (current.source === "dues" || current.source === "stash") return { db, error: "Ovaj unos mijenjaj u njegovom odjeljku." };
+      if (current.source === "dues" || current.source === "stash" || current.source === "balance") return { db, error: "Ovaj unos mijenjaj u njegovom odjeljku." };
       const entry = sanitizeLedger(action.entry);
       if (!entry) return { db, error: "Unos blagajne nije ispravan." };
       current.date = entry.date;

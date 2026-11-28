@@ -10,6 +10,7 @@ export const LEDGER_CATEGORIES: { id: LedgerCategory; label: string }[] = [
   { id: "renta", label: "Renta aparata" },
   { id: "racun", label: "Uplata na račun" },
   { id: "stash", label: "Dobrovoljni stash" },
+  { id: "korekcija", label: "Usklađenje stanja" },
   { id: "kotizacija", label: "Kotizacija" },
   { id: "liga", label: "Liga / savez" },
   { id: "oprema", label: "Oprema" },
@@ -111,6 +112,7 @@ export function treasuryBalance(treasury: Treasury): TreasuryBalance {
     if (entry.account === "bank") bank += signed;
     else cash += signed;
     if (entry.category === "stash" && entry.direction === "income") stash += amount;
+    if (entry.source === "balance") continue;
     const month = entry.date.slice(0, 7);
     if (!season.has(month)) continue;
     if (entry.direction === "income") seasonIncome += amount;
@@ -135,6 +137,12 @@ export function treasuryBalance(treasury: Treasury): TreasuryBalance {
 
 export function dueEntryMatch(entry: LedgerEntry, userId: string, month: string, kind: DueKind): boolean {
   return entry.source === "dues" && entry.dueUserId === userId && entry.dueMonth === month && entry.dueKind === kind;
+}
+
+export function lastBalanceUpdate(entries: LedgerEntry[], account: MoneyAccount): LedgerEntry | undefined {
+  return entries
+    .filter((entry) => entry.source === "balance" && entry.account === account)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
 
 export function dueAmount(treasury: Treasury, kind: DueKind): number {
