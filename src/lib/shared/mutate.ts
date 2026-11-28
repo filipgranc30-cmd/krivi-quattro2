@@ -1,4 +1,4 @@
-import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, isTreasurer, monthLabel, normalizeTreasury, roundEur, treasuryBalance } from "./blagajna";
+import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, isTreasurer, monthLabel, normalizeTreasury, plainIban, roundEur, treasuryBalance, validIban } from "./blagajna";
 import { todayZagreb } from "./dates";
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import { PROOF_ID } from "./proof";
@@ -307,6 +307,13 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       if (!validDue(action.renta) || !validDue(action.bank)) return { db, error: "Iznos nije ispravan." };
       next.treasury.rentaAmount = roundEur(action.renta);
       next.treasury.bankAmount = roundEur(action.bank);
+      return { db: next };
+    }
+    case "setIban": {
+      const denied = requireTreasurer(actor);
+      if (denied) return { db, error: denied };
+      if (!validIban(action.iban || "")) return { db, error: "IBAN nije ispravan." };
+      next.treasury.iban = plainIban(action.iban);
       return { db: next };
     }
     case "toggleDue": {

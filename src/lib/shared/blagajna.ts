@@ -5,6 +5,7 @@ export const SEASON_MONTHS = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-
 
 export const DEFAULT_RENTA = 25;
 export const DEFAULT_BANK = 10;
+export const DEFAULT_IBAN = "HR7723400091111291953";
 /** Filip Granc's account. Only this email may change the treasury. */
 export const TREASURER_EMAIL = "filipgranc30@gmail.com";
 
@@ -27,7 +28,22 @@ export const LEDGER_CATEGORIES: { id: LedgerCategory; label: string }[] = [
 const MONTH_SHORT = ["", "sij", "velj", "ožu", "tra", "svi", "lip", "srp", "kol", "ruj", "lis", "stu", "pro"];
 
 export function emptyTreasury(): Treasury {
-  return { rentaAmount: DEFAULT_RENTA, bankAmount: DEFAULT_BANK, dues: [], entries: [] };
+  return { rentaAmount: DEFAULT_RENTA, bankAmount: DEFAULT_BANK, iban: DEFAULT_IBAN, dues: [], entries: [] };
+}
+
+export function plainIban(value: string): string {
+  return value.replace(/\s+/g, "").toUpperCase();
+}
+
+export function formatIban(value: string): string {
+  const plain = plainIban(value);
+  const parts: string[] = [];
+  for (let index = 0; index < plain.length; index += 4) parts.push(plain.slice(index, index + 4));
+  return parts.join(" ");
+}
+
+export function validIban(value: string): boolean {
+  return /^HR\d{19}$/.test(plainIban(value));
 }
 
 function money(value: unknown, fallback: number): number {
@@ -40,6 +56,7 @@ export function normalizeTreasury(value: Partial<Treasury> | undefined): Treasur
   return {
     rentaAmount: money(value.rentaAmount, base.rentaAmount),
     bankAmount: money(value.bankAmount, base.bankAmount),
+    iban: validIban(value.iban || "") ? plainIban(value.iban || "") : base.iban,
     dues: Array.isArray(value.dues) ? value.dues.map((item) => ({ ...item })) : [],
     entries: Array.isArray(value.entries) ? value.entries.map((item) => ({ ...item, account: item.account === "bank" ? "bank" : "cash" })) : [],
   };
