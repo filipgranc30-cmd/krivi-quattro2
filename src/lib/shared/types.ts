@@ -238,7 +238,7 @@ export type Member = {
   email: string;
 };
 
-export type LedgerCategory = "renta" | "racun" | "stash" | "kotizacija" | "liga" | "oprema" | "pice" | "ostalo";
+export type LedgerCategory = "renta" | "racun" | "stash" | "korekcija" | "kotizacija" | "liga" | "oprema" | "pice" | "ostalo";
 export type MoneyAccount = "cash" | "bank";
 export type DueKind = "renta" | "racun";
 
@@ -265,7 +265,7 @@ export type LedgerEntry = {
   hasReceipt?: boolean;
   receiptUserId?: string;
   receiptRev?: number;
-  source?: "dues" | "stash" | "manual";
+  source?: "dues" | "stash" | "balance" | "manual";
   dueUserId?: string;
   dueMonth?: string;
   dueKind?: DueKind;
@@ -341,6 +341,7 @@ export type Action =
   | { op: "setDueAmounts"; renta: number; bank: number }
   | { op: "toggleDue"; userId: string; month: string; kind: DueKind }
   | { op: "addStash"; id?: string; date: string; amount: number; donorUserId?: string }
+  | { op: "setBalance"; account: MoneyAccount; amount: number }
   | { op: "addLedger"; entry: Omit<LedgerEntry, "createdById" | "createdByName" | "createdAt" | "hasReceipt" | "receiptUserId" | "receiptRev" | "source" | "dueUserId" | "dueMonth" | "dueKind" | "donorUserId" | "donorName"> & { id?: string } }
   | { op: "updateLedger"; entry: Pick<LedgerEntry, "id" | "date" | "amount" | "direction" | "account" | "category" | "description"> }
   | { op: "deleteLedger"; id: string }
