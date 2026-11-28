@@ -128,14 +128,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!ready || !user) return;
     const timer = window.setInterval(() => {
       refresh().catch(() => undefined);
-    }, 45000);
+    }, 15000);
     const onFocus = () => {
+      if (document.visibilityState === "hidden") return;
       refresh().catch(() => undefined);
     };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, [ready, refresh, user]);
 

@@ -29,5 +29,8 @@ export async function POST(request: Request) {
   if (error) return Response.json({ ok: false, error }, { status: 400 });
   if (push) await sendPush(db, actor.id, push, push.userIds);
   const fresh = db.users.find((user) => user.id === actor.id);
-  return Response.json({ ok: true, user: fresh ? publicUser(fresh) : actor, data: toPublic(db, fresh ? publicUser(fresh) : actor) });
+  return Response.json(
+    { ok: true, user: fresh ? publicUser(fresh) : actor, data: toPublic(db, fresh ? publicUser(fresh) : actor) },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

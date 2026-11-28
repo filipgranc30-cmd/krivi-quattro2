@@ -13,5 +13,8 @@ export async function GET() {
   const blocked = pendingBlock(user);
   if (blocked) return blocked;
   const db = await readDb();
-  return Response.json({ ok: true, user, data: toPublic(db, user) });
+  return Response.json(
+    { ok: true, user, data: toPublic(db, user) },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
