@@ -98,10 +98,9 @@ export default function TreasuryPage() {
         <SectionTitle>KLUBSKA BLAGAJNA</SectionTitle>
         <p className="mt-1 text-sm text-zinc-400">Sezona 2026/27. Renta aparata ide u gotovinu, uplata na račun udruge na žiro. Članovi vide stanje i cijelu tablicu.</p>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Card className="p-3"><div className="text-[10px] uppercase tracking-wider text-zinc-500">Gotovina</div><div className="font-display text-xl text-orange-300">{formatEur(balance.cash)}</div></Card>
         <Card className="p-3"><div className="text-[10px] uppercase tracking-wider text-zinc-500">Račun udruge</div><div className="font-display text-xl">{formatEur(balance.bank)}</div></Card>
-        <Card className="p-3"><div className="text-[10px] uppercase tracking-wider text-zinc-500">Ukupno</div><div className="font-display text-xl">{formatEur(balance.total)}</div></Card>
       </div>
       <Card>
         <SectionTitle>PO MJESECU</SectionTitle>
