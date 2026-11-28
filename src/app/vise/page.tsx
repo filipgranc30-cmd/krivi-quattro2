@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { BackupPanel } from "@/components/backup-panel";
 import { Card, Field, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
 
@@ -103,6 +104,7 @@ export default function MorePage() {
           </ul>
         </Card>
       )}
+      {admin && <BackupPanel />}
       {admin && (
         <Card>
           <h2 className="font-display text-lg">Ručni podaci lige</h2>
