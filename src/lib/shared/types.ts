@@ -276,6 +276,7 @@ export type LedgerEntry = {
 export type Treasury = {
   rentaAmount: number;
   bankAmount: number;
+  iban: string;
   dues: DuePayment[];
   entries: LedgerEntry[];
 };
@@ -339,6 +340,7 @@ export type Action =
   | { op: "deleteGame"; id: string }
   | { op: "setGameProof"; id: string; hasProof: boolean }
   | { op: "setDueAmounts"; renta: number; bank: number }
+  | { op: "setIban"; iban: string }
   | { op: "toggleDue"; userId: string; month: string; kind: DueKind }
   | { op: "addStash"; id?: string; date: string; amount: number; donorUserId?: string }
   | { op: "setBalance"; account: MoneyAccount; amount: number }
