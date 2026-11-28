@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
+import { VijestiTeaser } from "@/components/vijesti-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
@@ -134,6 +135,7 @@ export default function DashboardPage() {
         </ol>
       </Card>
 
+      <VijestiTeaser />
       <DailyDartsTeaser />
       <TurniriTeaser />
 

@@ -29,6 +29,10 @@ export default function MorePage() {
         <div className="font-display text-lg text-orange-300">Daily Darts</div>
         <div className="text-xs text-zinc-400">PDC Worlds, odaberi 4 igrača</div>
       </Link>
+      <Link href="/vijesti" className="block rounded-2xl border border-orange-500/40 bg-[#141418] p-4">
+        <div className="font-display text-lg text-orange-300">Pikado vijesti</div>
+        <div className="text-xs text-zinc-400">Hrvatska i svijet, naslovi iz izvora</div>
+      </Link>
       <Link href="/turniri" className="block rounded-2xl border border-orange-500/40 bg-[#141418] p-4">
         <div className="font-display text-lg text-orange-300">Turniri</div>
         <div className="text-xs text-zinc-400">Nadolazeći turniri, Runda Pikada</div>
