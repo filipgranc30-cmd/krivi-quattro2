@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { applyPdcImport, parsePdcTournament, tournamentNameOf, type PdcFixture } from "../shared/pdc";
 import { cloneDailyDarts, DEFAULT_PDC_TOURNAMENT, tournamentIdsOf } from "../shared/daily-darts";
 import { redis, isSharedMode } from "./redis";
@@ -55,7 +56,10 @@ export async function syncPdc(options: { force?: boolean } = {}): Promise<PdcSyn
 
 export function isCronRequest(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (secret) return request.headers.get("authorization") === `Bearer ${secret}`;
-  const agent = request.headers.get("user-agent") ?? "";
-  return agent.toLowerCase().includes("vercel-cron");
+  if (!secret) return false;
+  const header = request.headers.get("authorization") ?? "";
+  const actual = Buffer.from(header);
+  const expected = Buffer.from(`Bearer ${secret}`);
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
 }
