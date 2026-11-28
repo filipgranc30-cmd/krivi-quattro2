@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { BackupPanel } from "@/components/backup-panel";
+import { MemberName } from "@/components/member-name";
 import { Card, Field, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
+import { isTreasurer } from "@/lib/shared/blagajna";
 import { formatWhen } from "@/lib/shared/dates";
 
 export default function MorePage() {
@@ -16,12 +18,13 @@ export default function MorePage() {
   const [time, setTime] = useState(data.settings.trainingTime);
   const [venue, setVenue] = useState(data.settings.venue);
   const admin = user?.role === "admin";
+  const treasurer = isTreasurer(user);
 
   return (
     <div className="space-y-4">
       <SectionTitle>VIŠE</SectionTitle>
       <Card>
-        <div className="font-display text-2xl">{user?.name}</div>
+        <div className="font-display text-2xl">{user?.name ? <MemberName name={user.name} /> : ""}</div>
         <div className="text-sm text-zinc-400">{user?.email}</div>
         <div className="mt-1 text-sm text-orange-300">{user?.role === "admin" ? "Admin / trener" : "Član"}</div>
         <GhostButton className="mt-3 w-full" onClick={() => logout()}>Odjava</GhostButton>
@@ -76,7 +79,7 @@ export default function MorePage() {
           <ul className="mt-3 space-y-3">
             {data.pendingRequests.map((request) => (
               <li key={request.id} className="rounded-xl border border-white/10 p-3 text-sm">
-                <div className="font-semibold">{request.name}</div>
+                <div className="font-semibold"><MemberName name={request.name} /></div>
                 <div className="text-zinc-400">{request.email}</div>
                 <div className="text-xs text-zinc-500">{formatWhen(request.createdAt).label}</div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -95,14 +98,22 @@ export default function MorePage() {
             {data.members.map((member) => (
               <li key={member.id} className="flex items-center justify-between gap-2 text-sm">
                 <span>
-                  {member.name}
+                  <MemberName name={member.name} />
+                  {member.honorary && <span className="mt-0.5 block text-xs text-amber-300">Počasni član</span>}
                   <span className="block text-xs text-zinc-500">{member.email}</span>
                 </span>
-                {member.id !== user?.id && (
-                  <GhostButton onClick={() => act({ op: "setRole", userId: member.id, role: member.role === "admin" ? "member" : "admin" })}>
-                    {member.role === "admin" ? "Skini admin" : "Daj admin"}
-                  </GhostButton>
-                )}
+                <span className="flex flex-col items-end gap-1">
+                  {treasurer && (
+                    <GhostButton onClick={() => act({ op: "setHonorary", userId: member.id, honorary: !member.honorary })}>
+                      {member.honorary ? "Makni počasnog" : "Počasni član"}
+                    </GhostButton>
+                  )}
+                  {member.id !== user?.id && (
+                    <GhostButton onClick={() => act({ op: "setRole", userId: member.id, role: member.role === "admin" ? "member" : "admin" })}>
+                      {member.role === "admin" ? "Skini admin" : "Daj admin"}
+                    </GhostButton>
+                  )}
+                </span>
               </li>
             ))}
           </ul>

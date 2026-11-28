@@ -7,6 +7,7 @@ import { cricketTarget, parseCricketLeg, summarizeCricket, toCricketPlayers, typ
 import { formatHr } from "@/lib/shared/training-rank";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
+import { MemberName } from "./member-name";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "./ui";
 
 type Person = { key: string; name: string; userId?: string };
@@ -35,7 +36,7 @@ export function QuickCricket({ people, userId, onDetailed }: { people: Person[];
                 onClick={() => setPicked((current) => (current.includes(person.key) ? current.filter((id) => id !== person.key) : [...current, person.key]))}
                 className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${on ? "border-orange-500 bg-orange-500/10" : "border-white/10"}`}
               >
-                <span>{person.name}</span>
+                <span><MemberName name={person.name} /></span>
                 <span className="text-xs text-zinc-400">{on ? `${picked.indexOf(person.key) + 1}.` : "Dodaj"}</span>
               </button>
             );
@@ -97,7 +98,7 @@ function CricketMatch({ players, bestOf }: { players: Person[]; bestOf: number }
       <div className="grid grid-cols-2 gap-2">
         {players.map((person, index) => (
           <div key={person.key} className="rounded-xl border border-white/10 p-3">
-            <div className="truncate text-sm text-zinc-300">{person.name}</div>
+            <div className="truncate text-sm text-zinc-300"><MemberName name={person.name} /></div>
             <div className="font-display text-4xl text-orange-300">{summaries[index]?.legsWon ?? 0}</div>
           </div>
         ))}
@@ -113,7 +114,7 @@ function CricketMatch({ players, bestOf }: { players: Person[]; bestOf: number }
                 onClick={() => setWinnerIndex(index)}
                 className={`h-14 rounded-xl border px-2 text-sm font-bold ${winnerIndex === index ? "border-orange-500 bg-orange-500 text-black" : "border-white/15"}`}
               >
-                {person.name}
+                <MemberName name={person.name} />
               </button>
             ))}
           </div>
@@ -140,7 +141,7 @@ function CricketMatch({ players, bestOf }: { players: Person[]; bestOf: number }
         <div className="space-y-2">
           {legs.map((leg, index) => (
             <div key={`${leg.winnerIndex}-${index}`} className="flex justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
-              <span>Leg {index + 1} · {players[leg.winnerIndex]?.name}</span>
+              <span>Leg {index + 1} · {players[leg.winnerIndex] ? <MemberName name={players[leg.winnerIndex].name} /> : ""}</span>
               <span className="text-orange-300">{leg.round}. ruka</span>
             </div>
           ))}
@@ -166,11 +167,11 @@ function CricketResult({ players, legs, bestOf, target }: { players: Person[]; l
       <Card>
         <div className="text-center text-xs tracking-[0.16em] text-orange-400">{bestOf === 1 ? "1 LEG" : `BEST OF ${bestOf}`}</div>
         <p className="mt-3 text-center font-display text-3xl text-orange-400">{score}</p>
-        <p className="mt-2 text-center text-sm text-zinc-300">{summary}</p>
+        <p className="mt-2 text-center text-sm text-zinc-300">{winner >= 0 && players[winner] ? <><MemberName name={players[winner].name} /> dobiva {score}</> : score}</p>
       </Card>
       {summaries.map((player, index) => (
         <Card key={players[index]?.key ?? index}>
-          <div className="font-display text-xl">{player.legsWon >= target ? "★ " : ""}{players[index]?.name}</div>
+          <div className="font-display text-xl">{player.legsWon >= target ? "★ " : ""}{players[index] ? <MemberName name={players[index].name} /> : ""}</div>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <Stat label="Legovi" value={String(player.legsWon)} />
             <Stat label="Prosječna ruka" value={player.averageRound == null ? "—" : formatHr(player.averageRound, 1)} />
@@ -181,7 +182,7 @@ function CricketResult({ players, legs, bestOf, target }: { players: Person[]; l
       <div className="space-y-2">
         {legs.map((leg, index) => (
           <div key={`${leg.round}-${index}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm">
-            Leg {index + 1}: {players[leg.winnerIndex]?.name} u {leg.round}. ruci
+            Leg {index + 1}: {players[leg.winnerIndex] ? <MemberName name={players[leg.winnerIndex].name} /> : ""} u {leg.round}. ruci
           </div>
         ))}
       </div>

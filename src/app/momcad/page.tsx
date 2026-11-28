@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { MemberName } from "@/components/member-name";
 import { Card, Field, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
 import { isOurClub } from "@/lib/shared/util";
 
@@ -27,7 +28,7 @@ export default function SquadPage() {
         <ul className="mt-3 space-y-2 text-sm">
           {live.map((player) => (
             <li key={player.playerId || player.name} className="flex justify-between gap-3">
-              <span>{player.name}</span>
+              <span><MemberName name={player.name} /></span>
               <span className="text-orange-300">{player.points.toFixed(2).replace(".", ",")} bod</span>
             </li>
           ))}
@@ -40,7 +41,7 @@ export default function SquadPage() {
           {real.map((player) => (
             <li key={player.id} className="flex items-center justify-between gap-3 text-sm">
               <span>
-                {player.name}
+                <MemberName name={player.name} />
                 {player.nickname ? <span className="text-zinc-400"> „{player.nickname}”</span> : null}
                 {player.average != null ? <span className="block text-xs text-zinc-500">ručni prosjek {player.average}</span> : null}
               </span>
@@ -81,7 +82,7 @@ export default function SquadPage() {
           <ul className="mt-3 space-y-2 text-sm">
             {demo.map((player) => (
               <li key={player.id} className="flex items-center justify-between gap-3">
-                <span>{player.name} {player.nickname ? `„${player.nickname}”` : ""} · {player.average}</span>
+                <span><MemberName name={player.name} /> {player.nickname ? `„${player.nickname}”` : ""} · {player.average}</span>
                 {admin && <GhostButton onClick={() => act({ op: "deleteRoster", id: player.id })}>Obriši</GhostButton>}
               </li>
             ))}
@@ -93,7 +94,7 @@ export default function SquadPage() {
         <ul className="mt-2 space-y-1 text-sm">
           {data.members.map((member) => (
             <li key={member.id} className="flex justify-between">
-              <span>{member.name}</span>
+              <span><MemberName name={member.name} /></span>
               <span className="text-zinc-400">{member.role === "admin" ? "admin" : "član"}{isOurClub(member.name) ? "" : ""}</span>
             </li>
           ))}

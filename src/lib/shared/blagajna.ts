@@ -124,12 +124,13 @@ export type TreasuryBalance = {
   months: MonthTotals[];
 };
 
-export function treasuryBalance(treasury: Treasury): TreasuryBalance {
+export function treasuryBalance(treasury: Treasury, skipDueUserIds?: ReadonlySet<string>): TreasuryBalance {
   let cash = 0;
   let aparati = 0;
   let bank = 0;
   let stash = 0;
   for (const entry of treasury.entries) {
+    if (entry.source === "dues" && entry.dueUserId && skipDueUserIds?.has(entry.dueUserId)) continue;
     const amount = roundEur(entry.amount);
     const signed = entry.direction === "income" ? amount : -amount;
     if (entry.source === "balance" && entry.account === "cash") cash += signed;

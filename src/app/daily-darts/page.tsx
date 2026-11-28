@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { MemberName } from "@/components/member-name";
 import { Card, PrimaryButton, SectionTitle } from "@/components/ui";
 import { todayZagreb } from "@/lib/shared/dates";
 import {
@@ -148,7 +149,7 @@ export default function DailyDartsPage() {
           {daily.revealedPicks.filter((pick) => pick.dayId === day.id).map((pick) => (
             <Card key={pick.id}>
               <div className="flex justify-between gap-3">
-                <div className="font-semibold">{pick.userName}</div>
+                <div className="font-semibold"><MemberName name={pick.userName} /></div>
                 <div className="font-display text-xl text-orange-300">{memberDayPoints(state, pick)}</div>
               </div>
               <p className="mt-1 text-sm text-zinc-400">{pick.playerIds.map((id) => `${names.get(id) ?? "Igrač"} (${pointsOf(state, day.id, id)})`).join(" · ")}</p>
@@ -172,14 +173,14 @@ export default function DailyDartsPage() {
         {overall.map((row, index) => (
           <Card key={row.userId}>
             <div className="flex justify-between gap-3">
-              <div className="font-semibold">{index + 1}. {row.name}</div>
+              <div className="font-semibold">{index + 1}. <MemberName name={row.name} /></div>
               <div className="font-display text-xl text-orange-300">{row.points}</div>
             </div>
             <p className="text-xs text-zinc-500">{row.days} dana · najbolji dan {row.bestDay}</p>
           </Card>
         ))}
-        {best && <p className="text-sm text-zinc-300">Najbolji dan: {best.name}, {best.bestDay} bodova.</p>}
-        {favourite && <p className="text-sm text-zinc-300">Najbiraniji igrač: {favourite.player.name} ({favourite.count}×).</p>}
+        {best && <p className="text-sm text-zinc-300">Najbolji dan: <MemberName name={best.name} />, {best.bestDay} bodova.</p>}
+        {favourite && <p className="text-sm text-zinc-300">Najbiraniji igrač: <MemberName name={favourite.player.name} /> ({favourite.count}×).</p>}
       </section>
 
       <p className="text-center text-xs text-zinc-500">
@@ -208,7 +209,7 @@ function Ranking({ rows }: { rows: DailyRankRow[] }) {
     <div className="space-y-2">
       {rows.map((row, index) => (
         <div key={row.userId} className="flex justify-between rounded-xl border border-white/10 px-3 py-2">
-          <span>{index + 1}. {row.name}</span>
+          <span>{index + 1}. <MemberName name={row.name} /></span>
           <span className="font-display text-lg text-orange-300">{row.points}</span>
         </div>
       ))}
@@ -219,7 +220,7 @@ function Ranking({ rows }: { rows: DailyRankRow[] }) {
 function PickButton({ name, points, selected, locked, onClick }: { name: string; points: number; selected: boolean; locked: boolean; onClick: () => void }) {
   return (
     <button type="button" disabled={locked && !selected} onClick={onClick} className={`flex h-12 w-full items-center justify-between rounded-xl border px-3 text-left ${selected ? "border-orange-500 bg-orange-500/15" : "border-white/10"}`}>
-      <span className="truncate font-semibold">{name}</span>
+      <span className="truncate font-semibold"><MemberName name={name} /></span>
       <span className="text-sm text-orange-300">{points || "–"}</span>
     </button>
   );

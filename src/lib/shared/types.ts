@@ -236,6 +236,7 @@ export type Member = {
   status: AccountStatus;
   createdAt: string;
   email: string;
+  honorary?: boolean;
 };
 
 export type LedgerCategory = "renta" | "racun" | "stash" | "korekcija" | "kotizacija" | "liga" | "oprema" | "pice" | "ostalo";
@@ -295,7 +296,7 @@ export type AppData = {
   treasury: Treasury;
 };
 
-export type StoredUser = UserPublic & { passwordHash: string };
+export type StoredUser = UserPublic & { passwordHash: string; honorary?: boolean };
 
 export type Session = {
   id: string;
@@ -341,6 +342,7 @@ export type Action =
   | { op: "setGameProof"; id: string; hasProof: boolean }
   | { op: "setDueAmounts"; renta: number; bank: number }
   | { op: "setIban"; iban: string }
+  | { op: "setHonorary"; userId: string; honorary: boolean }
   | { op: "toggleDue"; userId: string; month: string; kind: DueKind }
   | { op: "addStash"; id?: string; date: string; amount: number; donorUserId?: string }
   | { op: "setBalance"; account: MoneyAccount; amount: number }

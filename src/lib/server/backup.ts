@@ -45,12 +45,12 @@ export async function listBackups(): Promise<BackupListItem[]> {
   return items;
 }
 
-export async function createWeeklyBackup(at = new Date()): Promise<BackupRun> {
+export async function createWeeklyBackup(at = new Date(), options?: { force?: boolean }): Promise<BackupRun> {
   if (!isSharedMode()) return { ok: false, message: "Dijeljena baza nije spojena." };
   if (!blobConfigured()) return { ok: false, message: "Spremište kopija nije spojeno." };
   const week = currentBackupWeek(at);
   const existing = (await listBackups()).find((item) => item.week === week);
-  if (existing) {
+  if (existing && !options?.force) {
     return { ok: true, skipped: true, message: "Kopija za ovaj tjedan već postoji.", name: existing.name, bytes: existing.bytes };
   }
   const keys = await dumpRedis();

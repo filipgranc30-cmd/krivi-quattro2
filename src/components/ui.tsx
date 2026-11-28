@@ -1,5 +1,6 @@
 "use client";
 
+import { MemberName } from "@/components/member-name";
 import type { Attendance, AttendanceStatus } from "@/lib/shared/types";
 import { formatWhen } from "@/lib/shared/dates";
 
@@ -102,7 +103,7 @@ export function AttendancePanel({
         {rows.length === 0 && <li className="text-zinc-500">Još nitko nije potvrdio.</li>}
         {rows.map((item) => (
           <li key={item.id} className="flex justify-between gap-3">
-            <span>{item.userName}</span>
+            <span><MemberName name={item.userName} /></span>
             <span className={item.status === "dolazim" ? "text-orange-300" : "text-zinc-400"}>{STATUS_LABEL[item.status]}</span>
           </li>
         ))}
