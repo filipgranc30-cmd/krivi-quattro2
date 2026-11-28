@@ -309,6 +309,14 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       next.treasury.bankAmount = roundEur(action.bank);
       return { db: next };
     }
+    case "setHonorary": {
+      const denied = requireTreasurer(actor);
+      if (denied) return { db, error: denied };
+      const member = next.users.find((user) => user.id === action.userId);
+      if (!member || accountStatus(member) !== "active") return { db, error: "Član nije pronađen." };
+      member.honorary = Boolean(action.honorary);
+      return { db: next };
+    }
     case "setIban": {
       const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
@@ -323,6 +331,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       if (!isSeasonMonth(action.month)) return { db, error: "Nepoznat mjesec sezone." };
       const member = next.users.find((user) => user.id === action.userId && accountStatus(user) === "active");
       if (!member) return { db, error: "Član nije pronađen." };
+      if (member.honorary) return { db, error: "Počasni član nema mjesečnu uplatu." };
       const paid = next.treasury.dues.some((item) => item.userId === action.userId && item.month === action.month && item.kind === action.kind);
       if (paid) {
         next.treasury.dues = next.treasury.dues.filter((item) => !(item.userId === action.userId && item.month === action.month && item.kind === action.kind));
@@ -623,6 +632,7 @@ export function toPublic(db: Db, viewer: UserPublic | null): AppData {
       status: "active" as const,
       createdAt: user.createdAt,
       email: isAdmin ? user.email : "",
+      honorary: Boolean(user.honorary),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "hr"));
   const pendingRequests: Member[] = isAdmin

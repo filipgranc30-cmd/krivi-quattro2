@@ -8,6 +8,7 @@ import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
 import { VijestiTeaser } from "@/components/vijesti-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
+import { MemberName, MemberNames } from "@/components/member-name";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
 import { formatDateHr, formatWhen, todayZagreb, weekdayName } from "@/lib/shared/dates";
 import { leagueBadge, nextMatch, opponentBoard } from "@/lib/shared/schedule";
@@ -73,8 +74,8 @@ export default function DashboardPage() {
           <span className="text-xs font-semibold text-orange-300">Otvori</span>
         </div>
         <p className="mt-2 text-xs text-zinc-500">{weekdayName(today)} {formatDateHr(today)} · {data.settings.trainingTime}</p>
-        <p className="mt-2 text-sm text-zinc-300">Dolazi: {trainingComing.join(", ") || "nitko"}</p>
-        <p className="mt-1 text-sm text-red-300">Ne dolazi: {trainingAbsent.join(", ") || "nitko"}</p>
+        <p className="mt-2 text-sm text-zinc-300">Dolazi: <MemberNames names={trainingComing} /></p>
+        <p className="mt-1 text-sm text-red-300">Ne dolazi: <MemberNames names={trainingAbsent} /></p>
       </Link>
 
       <Card>
@@ -103,7 +104,7 @@ export default function DashboardPage() {
                   <li key={`${row.name}-${index}`} className="flex items-center justify-between gap-3 text-sm">
                     <span>
                       <span className="mr-2 text-zinc-500">{index + 1}.</span>
-                      {row.name}
+                      <MemberName name={row.name} />
                       <span className="block text-xs text-zinc-500">{row.detail}{row.hint ? ` · ${row.hint}` : ""}</span>
                     </span>
                     <span className="font-display text-xl text-orange-300">{row.value}</span>
@@ -127,7 +128,7 @@ export default function DashboardPage() {
           {(snapshot?.ourPlayers ?? []).slice(0, 8).map((player) => (
             <li key={player.playerId || player.name} className="flex items-center justify-between text-sm">
               <span>
-                <span className="text-zinc-500">{player.rank}.</span> {player.name}
+                <span className="text-zinc-500">{player.rank}.</span> <MemberName name={player.name} />
               </span>
               <span className="font-display text-lg text-orange-300">{player.points.toFixed(2).replace(".", ",")}</span>
             </li>

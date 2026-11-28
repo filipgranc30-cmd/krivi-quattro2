@@ -10,7 +10,9 @@ import type { DueKind } from "@/lib/shared/types";
 export default function TreasuryPage() {
   const { data, user, act } = useApp();
   const treasurer = isTreasurer(user);
-  const balance = treasuryBalance(data.treasury);
+  const duesMembers = data.members.filter((member) => !member.honorary);
+  const skipDues = new Set(data.members.filter((member) => member.honorary).map((member) => member.id));
+  const balance = treasuryBalance(data.treasury, skipDues);
   const [rentaInput, setRentaInput] = useState(String(data.treasury.rentaAmount));
   const [bankInput, setBankInput] = useState(String(data.treasury.bankAmount));
   const [note, setNote] = useState("");
@@ -66,7 +68,7 @@ export default function TreasuryPage() {
               </tr>
             </thead>
             <tbody>
-              {data.members.map((member) => {
+              {duesMembers.map((member) => {
                 const mine = member.id === user?.id;
                 return (
                   <tr key={member.id} className={mine ? "text-orange-100" : ""}>

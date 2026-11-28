@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/quick501";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
+import { MemberName } from "./member-name";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "./ui";
 
 type Person = { key: string; name: string; userId?: string };
@@ -52,7 +53,7 @@ export function Quick501({ people, userId, onDetailed }: { people: Person[]; use
                 }}
                 className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${on ? "border-orange-500 bg-orange-500/10" : "border-white/10"}`}
               >
-                <span>{person.name}</span>
+                <span><MemberName name={person.name} /></span>
                 <span className="text-xs text-zinc-400">{on ? "Odabran" : picked.length >= 2 ? "" : "Dodaj"}</span>
               </button>
             );
@@ -69,7 +70,7 @@ export function Quick501({ people, userId, onDetailed }: { people: Person[]; use
                   onClick={() => setStarterKey(person.key)}
                   className={`h-12 truncate rounded-xl border px-2 text-sm font-bold ${person.key === starter ? "border-orange-500 bg-orange-500 text-black" : "border-white/15"}`}
                 >
-                  {person.name}
+                  <MemberName name={person.name} />
                 </button>
               ))}
             </div>
@@ -151,19 +152,18 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
     return <QuickResult players={players} legs={legs} summaries={summaries} target={target} bestOf={bestOf} />;
   }
 
-  const loserName = winnerIndex == null ? "gubitniku" : players[winnerIndex === 0 ? 1 : 0]?.name;
   return (
     <div className="space-y-4">
       <div>
         <SectionTitle>501 DO · LEG {legIndex + 1}</SectionTitle>
         <p className="mt-1 text-sm text-zinc-400">
-          {bestOf === 1 ? "1 leg" : `Best of ${bestOf} · prvi do ${target}`} · prvi baca {players[starter]?.name}
+          {bestOf === 1 ? "1 leg" : `Best of ${bestOf} · prvi do ${target}`} · prvi baca {players[starter] ? <MemberName name={players[starter].name} /> : ""}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {players.map((person, index) => (
           <div key={person.key} className="rounded-xl border border-white/10 p-3">
-            <div className="truncate text-sm text-zinc-300">{person.name}</div>
+            <div className="truncate text-sm text-zinc-300"><MemberName name={person.name} /></div>
             <div className="font-display text-4xl text-orange-300">{summaries[index]?.legsWon ?? 0}</div>
             <div className="text-[11px] text-zinc-500">{index === starter ? "baca prvi" : ""}</div>
           </div>
@@ -180,7 +180,7 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
                 onClick={() => setWinnerIndex(index)}
                 className={`h-14 rounded-xl border px-2 text-sm font-bold ${winnerIndex === index ? "border-orange-500 bg-orange-500 text-black" : "border-white/15"}`}
               >
-                {person.name}
+                <MemberName name={person.name} />
               </button>
             ))}
           </div>
@@ -217,7 +217,7 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
           </div>
         </div>
         <label className="block">
-          <span className="mb-1 block text-xs text-zinc-400">Koliko je ostalo: {loserName}</span>
+          <span className="mb-1 block text-xs text-zinc-400">Koliko je ostalo: {winnerIndex == null || !players[winnerIndex === 0 ? 1 : 0] ? "gubitniku" : <MemberName name={players[winnerIndex === 0 ? 1 : 0].name} />}</span>
           <input
             inputMode="numeric"
             value={remaining}
@@ -231,7 +231,7 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
           <div className="mt-2 space-y-2">
             {players.map((person, index) => (
               <div key={person.key} className="flex items-center justify-between gap-3">
-                <span className="truncate text-sm">{person.name}</span>
+                <span className="truncate text-sm"><MemberName name={person.name} /></span>
                 <div className="flex items-center gap-2">
                   <button type="button" className="h-11 w-11 rounded-xl border border-white/15 text-xl" onClick={() => setOneEighties((current) => current.map((value, item) => (item === index ? Math.max(0, value - 1) : value)))}>–</button>
                   <div className="font-display w-8 text-center text-2xl">{oneEighties[index] ?? 0}</div>
@@ -254,12 +254,22 @@ function QuickMatch({ players, starterIndex, bestOf }: { players: Person[]; star
           {legs.map((leg, index) => (
             <div key={`${leg.winnerIndex}-${index}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm">
               <div className="flex justify-between gap-3">
-                <span>Leg {index + 1} · {players[leg.winnerIndex]?.name}</span>
+                <span>Leg {index + 1} · {players[leg.winnerIndex] ? <MemberName name={players[leg.winnerIndex].name} /> : ""}</span>
                 <span className="text-orange-300">{leg.winnerDarts} str. · {checkoutLabel(leg.round, leg.dart)}</span>
               </div>
               <div className="text-xs text-zinc-500">
-                {players[leg.loserIndex]?.name} ostalo {leg.loserRemaining} · {leg.loserDarts} strelica · prosjek {leg.loserAvg.toFixed(1)}
-                {leg.oneEighties.some((count) => count > 0) ? ` · 180: ${leg.oneEighties.map((count, index) => `${players[index]?.name.split(" ")[0]} ${count}`).join(", ")}` : ""}
+                {players[leg.loserIndex] ? <MemberName name={players[leg.loserIndex].name} /> : ""} ostalo {leg.loserRemaining} · {leg.loserDarts} strelica · prosjek {leg.loserAvg.toFixed(1)}
+                {leg.oneEighties.some((count) => count > 0) && (
+                  <>
+                    {" · 180: "}
+                    {leg.oneEighties.map((count, playerIndex) => (
+                      <span key={players[playerIndex]?.key ?? playerIndex}>
+                        {playerIndex > 0 ? ", " : ""}
+                        {players[playerIndex] ? <MemberName name={players[playerIndex].name} /> : ""} {count}
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -296,15 +306,15 @@ function QuickResult({
       <Card>
         <div className="text-center text-xs tracking-[0.16em] text-orange-400">{bestOf === 1 ? "1 LEG" : `BEST OF ${bestOf}`}</div>
         <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-          <div className="font-display text-xl leading-tight">{players[0]?.name}</div>
+          <div className="font-display text-xl leading-tight">{players[0] ? <MemberName name={players[0].name} /> : ""}</div>
           <div className="font-display text-4xl text-orange-400">{score}</div>
-          <div className="font-display text-xl leading-tight">{players[1]?.name}</div>
+          <div className="font-display text-xl leading-tight">{players[1] ? <MemberName name={players[1].name} /> : ""}</div>
         </div>
-        <p className="mt-2 text-center text-sm text-zinc-300">{summary}</p>
+        <p className="mt-2 text-center text-sm text-zinc-300">{winner >= 0 && players[winner] ? <><MemberName name={players[winner].name} /> dobiva {score}</> : score}</p>
       </Card>
       {summaries.map((player, index) => (
         <Card key={players[index]?.key ?? index}>
-          <div className="font-display text-xl">{player.legsWon >= target ? "★ " : ""}{players[index]?.name}</div>
+          <div className="font-display text-xl">{player.legsWon >= target ? "★ " : ""}{players[index] ? <MemberName name={players[index].name} /> : ""}</div>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <Stat label="Legovi" value={String(player.legsWon)} />
             <Stat label="Prosjek" value={player.average.toFixed(1)} />
@@ -317,7 +327,7 @@ function QuickResult({
       <div className="space-y-2">
         {legs.map((leg, index) => (
           <div key={`${leg.round}-${index}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm">
-            Leg {index + 1}: {players[leg.winnerIndex]?.name} {checkoutLabel(leg.round, leg.dart)} ({leg.winnerDarts} str., prosjek {leg.winnerAvg.toFixed(1)}) · ostalo {leg.loserRemaining}
+            Leg {index + 1}: {players[leg.winnerIndex] ? <MemberName name={players[leg.winnerIndex].name} /> : ""} {checkoutLabel(leg.round, leg.dart)} ({leg.winnerDarts} str., prosjek {leg.winnerAvg.toFixed(1)}) · ostalo {leg.loserRemaining}
           </div>
         ))}
       </div>

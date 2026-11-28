@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { TrainingNav } from "@/components/training-nav";
+import { MemberNames } from "@/components/member-name";
 import { Card, GhostButton, SectionTitle } from "@/components/ui";
 import { addDays, formatDateHr, mondayOf, todayZagreb, weekdayName } from "@/lib/shared/dates";
 import type { AttendanceStatus } from "@/lib/shared/types";
@@ -58,8 +59,8 @@ export default function TrainingAttendancePage() {
                   <div className="font-display text-lg">{weekdayName(date)}</div>
                   <div className="text-xs text-zinc-400">{formatDateHr(date)} · {data.settings.trainingTime}</div>
                 </div>
-                <div className="mt-1 text-xs text-zinc-400">Dolazi: {coming.map((item) => item.userName).join(", ") || "nitko"}</div>
-                <div className="mt-1 text-xs text-red-300">Ne dolazi: {absent.map((item) => item.userName).join(", ") || "nitko"}</div>
+                <div className="mt-1 text-xs text-zinc-400">Dolazi: <MemberNames names={coming.map((item) => item.userName)} /></div>
+                <div className="mt-1 text-xs text-red-300">Ne dolazi: <MemberNames names={absent.map((item) => item.userName)} /></div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "dolazim", mine)} className={`h-11 rounded-xl text-sm font-bold ${mine === "dolazim" ? "bg-orange-500 text-black" : "border border-orange-500/40"}`}>Dolazim</button>
                   <button type="button" disabled={pending !== ""} onClick={() => setStatus(date, "ne_dolazim", mine)} className={`h-11 rounded-xl text-sm font-bold ${mine === "ne_dolazim" ? "bg-red-500" : "border border-white/15"}`}>Ne dolazim</button>

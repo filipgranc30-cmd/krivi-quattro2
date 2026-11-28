@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { prepareImage } from "@/lib/client/prepare-image";
+import { MemberName } from "@/components/member-name";
 import { Card, GhostButton, PrimaryButton, SectionTitle } from "@/components/ui";
 import type { DailyDartsScoring, DailyDartsStat } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
@@ -203,7 +204,7 @@ function PlayerField({ label, players, value, onChange }: { label: string; playe
         <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-white/10 bg-black">
           {options.map((player) => (
             <button key={player.id} type="button" className="block w-full px-3 py-2 text-left text-sm text-white" onClick={() => { onChange(player.id); setText(""); setOpen(false); }}>
-              {player.name}
+              <MemberName name={player.name} />
             </button>
           ))}
           {!options.length && <p className="px-3 py-2 text-sm text-zinc-500">Nema igrača.</p>}

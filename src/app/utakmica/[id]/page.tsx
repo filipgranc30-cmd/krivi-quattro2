@@ -4,6 +4,7 @@ import { getZapisnik, validZapisnikId } from "@/lib/server/zapisnik";
 import type { Zapisnik, ZapisnikGame, ZapisnikPlayer } from "@/lib/server/zapisnik-parse";
 import { formatWhen } from "@/lib/shared/dates";
 import { zapisnikSource } from "@/lib/shared/zapisnik";
+import { MemberName, MemberNames } from "@/components/member-name";
 import { isOurClub } from "@/lib/shared/util";
 import type { SnapshotFixture } from "@/lib/shared/types";
 
@@ -130,7 +131,7 @@ function Side({
   return (
     <div className={`flex items-center justify-between gap-3 py-1 ${won ? "text-white" : "text-zinc-400"}`}>
       <div>
-        <div className={ours && won ? "text-orange-200" : ""}>{names.join(" / ") || "—"}</div>
+        <div className={ours && won ? "text-orange-200" : ""}><MemberNames names={names} empty="—" separator=" / " /></div>
         {average && <div className="text-[11px] text-zinc-500">prosjek {average}</div>}
       </div>
       <div className={`font-display text-2xl ${won ? "text-orange-300" : ""}`}>{score ?? "–"}</div>
@@ -141,7 +142,7 @@ function Side({
 function PlayerRow({ player }: { player: ZapisnikPlayer }) {
   return (
     <li className="flex items-baseline justify-between gap-3">
-      <span>{player.name}</span>
+      <span><MemberName name={player.name} /></span>
       <span className="text-xs text-zinc-400">
         {player.wins}/{player.games} pobjeda · legovi {player.legsFor}:{player.legsAgainst}
       </span>

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { isOurClub } from "@/lib/shared/util";
 import type { LeagueBundle } from "@/lib/shared/types";
+import { MemberName } from "@/components/member-name";
 import { SectionTitle } from "@/components/ui";
 
 export default function LeagueTablePage() {
@@ -41,7 +42,7 @@ export default function LeagueTablePage() {
               <div key={row.crewId} className={`rounded-xl border px-3 py-2 ${isOurClub(row.name) ? "border-orange-500 bg-orange-500/15" : "border-white/10"}`}>
                 <div className="flex items-baseline justify-between gap-3">
                   <div className="font-semibold">
-                    {row.position}. {row.name}
+                    {row.position}. <MemberName name={row.name} />
                   </div>
                   <div className="font-display text-xl text-orange-300">{String(row.points).replace(".", ",")}</div>
                 </div>

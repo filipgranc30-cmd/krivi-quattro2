@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { deleteHighScoreProof, saveHighScoreProof } from "@/lib/client/proof-api";
 import { prepareProofImage } from "@/lib/client/proof-image";
@@ -12,6 +12,7 @@ import { DEFAULT_TRAINING_PLAYER } from "@/lib/shared/seed";
 import type { AppData, GamePlayerResult, SavedGame } from "@/lib/shared/types";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
+import { MemberName } from "./member-name";
 import { QuickCricket } from "./quick-cricket";
 import { Quick501 } from "./quick501";
 import { HIGH_SCORE_MAX, HIGH_SCORE_ROUNDS, highScoreAverage } from "@/lib/shared/highscore";
@@ -66,7 +67,7 @@ export function GameScreen({ type }: { type: GameType }) {
                 }
                 className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${on ? "border-orange-500 bg-orange-500/10" : "border-white/10"}`}
               >
-                <span>{person.name}</span>
+                <span><MemberName name={person.name} /></span>
                 <span className="text-xs text-zinc-400">{on ? `${selection.indexOf(person.key) + 1}.` : "Dodaj"}</span>
               </button>
             );
@@ -347,7 +348,7 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
       <div className="grid grid-cols-2 gap-2">
         {list.map((player, index) => (
           <div key={player.key} className={`rounded-xl border p-3 ${index === turn && winner == null ? "border-orange-500" : "border-white/10"}`}>
-            <div className="truncate text-sm text-zinc-300">{player.name}</div>
+            <div className="truncate text-sm text-zinc-300"><MemberName name={player.name} /></div>
             <div className="font-display text-4xl leading-none">{player.remaining}</div>
             <div className="mt-1 text-[11px] text-zinc-500">
               {player.sets > 0 || setsToWin > 1 ? `${player.sets} set · ` : ""}
@@ -359,7 +360,7 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
       </div>
       {winner == null && current && (
         <Card>
-          <div className="text-xs tracking-widest text-orange-400">NA REDU · {current.name}</div>
+          <div className="text-xs tracking-widest text-orange-400">NA REDU · <MemberName name={current.name} /></div>
           <div className="font-display mt-1 text-6xl leading-none">{current.remaining}</div>
           <div className="mt-2 text-sm text-orange-200">
             {current.remaining <= 170 ? suggestCheckout(current.remaining) || "Nema izlaza na duplo" : "Izlaz na duplo kreće od 170"}
@@ -428,7 +429,14 @@ function Game501({ players, legsToWin, setsToWin }: { players: Person[]; legsToW
           )}
         </Card>
       )}
-      {winner != null && <ResultBox type="501" summary={`${list[winner].name} dobiva 501`} players={results} />}
+      {winner != null && (
+        <ResultBox
+          type="501"
+          summary={`${list[winner].name} dobiva 501`}
+          headline={<><MemberName name={list[winner].name} /> dobiva 501</>}
+          players={results}
+        />
+      )}
     </div>
   );
 }
@@ -511,7 +519,7 @@ function GameCricket({ players }: { players: Person[] }) {
               <th className="py-1">Broj</th>
               {list.map((player, index) => (
                 <th key={player.key} className={index === turn && winner == null ? "text-orange-300" : ""}>
-                  {player.name.split(" ")[0]}
+                  <MemberName name={player.name} />
                 </th>
               ))}
             </tr>
@@ -536,7 +544,7 @@ function GameCricket({ players }: { players: Person[] }) {
       </div>
       {winner == null && (
         <Card>
-          <div className="text-sm text-orange-300">{list[turn]?.name} · strelica {thrown + 1}/3</div>
+          <div className="text-sm text-orange-300">{list[turn] ? <MemberName name={list[turn].name} /> : ""} · strelica {thrown + 1}/3</div>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {([1, 2, 3] as const).map((value) => (
               <button key={value} type="button" className={`h-10 rounded-lg border ${mult === value ? "border-orange-500" : "border-white/10"}`} onClick={() => setMult(value)}>
@@ -557,7 +565,14 @@ function GameCricket({ players }: { players: Person[] }) {
           </button>
         </Card>
       )}
-      {winner != null && <ResultBox type="cricket" summary={`${list[winner].name} zatvara cricket`} players={results} />}
+      {winner != null && (
+        <ResultBox
+          type="cricket"
+          summary={`${list[winner].name} zatvara cricket`}
+          headline={<><MemberName name={list[winner].name} /> zatvara cricket</>}
+          players={results}
+        />
+      )}
     </div>
   );
 }
@@ -604,7 +619,7 @@ function GameMarathon({ players }: { players: Person[] }) {
       {state.players.map((player, index) => (
         <div key={player.key} className={`rounded-xl border p-3 ${!state.over && index === state.turn ? "border-orange-500" : "border-white/10"}`}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-semibold">{player.name}</span>
+            <span className="font-semibold"><MemberName name={player.name} /></span>
             <span className="text-xs text-zinc-400">{player.finished ? "D1" : MARATHON_TARGETS[player.target].label}</span>
           </div>
           <div className="mt-1 flex justify-between text-sm">
@@ -616,7 +631,7 @@ function GameMarathon({ players }: { players: Person[] }) {
       {!state.over && current && (
         <Card>
           <div className="flex items-center justify-between text-sm text-orange-300">
-            <span>{current.name}</span>
+            <span><MemberName name={current.name} /></span>
             <span>Runda {current.rounds + 1}/{MARATHON_ROUNDS} · strelica {state.dart + 1}/3</span>
           </div>
           <div className="mt-2 text-center text-xs tracking-[0.2em] text-zinc-500">TRENUTNA META</div>
@@ -639,6 +654,11 @@ function GameMarathon({ players }: { players: Person[] }) {
             state.players[winnerIndex].finished
               ? `${state.players[winnerIndex].name} pogađa D1 · ${state.players[winnerIndex].hits} pogodaka`
               : `${state.players[winnerIndex].name} ima najviše pogodaka (${state.players[winnerIndex].hits})`
+          }
+          headline={
+            state.players[winnerIndex].finished
+              ? <><MemberName name={state.players[winnerIndex].name} /> pogađa D1 · {state.players[winnerIndex].hits} pogodaka</>
+              : <><MemberName name={state.players[winnerIndex].name} /> ima najviše pogodaka ({state.players[winnerIndex].hits})</>
           }
           players={results}
         />
@@ -691,7 +711,7 @@ function GameTotals({ players }: { players: Person[] }) {
       {list.map((player, index) => (
         <div key={player.key} className={`rounded-xl border p-3 ${!done && index === turn ? "border-orange-500" : "border-white/10"}`}>
           <div className="flex justify-between gap-3">
-            <span>{player.name}</span>
+            <span><MemberName name={player.name} /></span>
             <span className="text-zinc-400">{player.total == null ? "čeka" : "uneseno"}</span>
           </div>
           <div className="font-display text-4xl">{player.total ?? "–"}</div>
@@ -700,7 +720,7 @@ function GameTotals({ players }: { players: Person[] }) {
       ))}
       {!done && (
         <Card>
-          <div className="text-sm text-orange-300">{list[turn]?.name} · konačni zbroj</div>
+          <div className="text-sm text-orange-300">{list[turn] ? <MemberName name={list[turn].name} /> : ""} · konačni zbroj</div>
           <div className="font-display mt-2 text-center text-5xl">{entry || "0"}</div>
           {message && <div className="mt-1 text-sm text-red-300">{message}</div>}
           <div className="mt-3 grid grid-cols-3 gap-2">
@@ -721,12 +741,19 @@ function GameTotals({ players }: { players: Person[] }) {
           </div>
         </Card>
       )}
-      {done && winnerIndex != null && <ResultBox type="highscore" summary={`${list[winnerIndex].name} ima najveći zbroj`} players={results} />}
+      {done && winnerIndex != null && (
+        <ResultBox
+          type="highscore"
+          summary={`${list[winnerIndex].name} ima najveći zbroj`}
+          headline={<><MemberName name={list[winnerIndex].name} /> ima najveći zbroj</>}
+          players={results}
+        />
+      )}
     </div>
   );
 }
 
-function ResultBox({ type, summary, players }: { type: GameType; summary: string; players: GamePlayerResult[] }) {
+function ResultBox({ type, summary, headline, players }: { type: GameType; summary: string; headline?: ReactNode; players: GamePlayerResult[] }) {
   const { act, mode, refresh } = useApp();
   const router = useRouter();
   const [gameId] = useState(uid);
@@ -779,11 +806,11 @@ function ResultBox({ type, summary, players }: { type: GameType; summary: string
   return (
     <Card>
       <SectionTitle>KRAJ</SectionTitle>
-      <p className="mt-2 text-lg">{summary}</p>
+      <p className="mt-2 text-lg">{headline ?? summary}</p>
       <ul className="mt-3 space-y-2 text-sm">
         {players.map((player) => (
           <li key={player.name} className="flex justify-between gap-3">
-            <span>{player.won ? "★ " : ""}{player.name}</span>
+            <span>{player.won ? "★ " : ""}<MemberName name={player.name} /></span>
             <span className="text-orange-300">
               {type === "marathon"
                 ? `${player.totalScore ?? 0} pogodaka${player.marathonPoints != null ? ` · ${player.marathonPoints} bod` : ""}`

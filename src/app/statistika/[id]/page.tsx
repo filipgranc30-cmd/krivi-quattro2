@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { isOurClub, normName } from "@/lib/shared/util";
 import type { LeagueBundle } from "@/lib/shared/types";
+import { MemberName } from "@/components/member-name";
 import { SectionTitle } from "@/components/ui";
 
 function PlayerStats() {
@@ -54,7 +55,7 @@ function PlayerStats() {
         {rows.map((player) => (
           <div key={`${player.playerId}-${player.name}`} className={`rounded-xl border px-3 py-2 ${isOurClub(player.club) ? "border-orange-500/60 bg-orange-500/10" : "border-white/10"}`}>
             <div className="flex items-baseline justify-between gap-3">
-              <div className="font-semibold">{player.rank}. {player.name}</div>
+              <div className="font-semibold">{player.rank}. <MemberName name={player.name} /></div>
               <div className="font-display text-xl text-orange-300">{player.points.toFixed(2).replace(".", ",")}</div>
             </div>
             <div className="text-xs text-zinc-400">{player.club} · {player.winPct.toFixed(0)}% · odig. {player.played} · {player.wl} · leg {player.legs}</div>
