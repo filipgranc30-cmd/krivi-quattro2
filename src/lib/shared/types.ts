@@ -238,6 +238,48 @@ export type Member = {
   email: string;
 };
 
+export type LedgerCategory = "renta" | "racun" | "stash" | "kotizacija" | "liga" | "oprema" | "pice" | "ostalo";
+export type MoneyAccount = "cash" | "bank";
+export type DueKind = "renta" | "racun";
+
+export type DuePayment = {
+  userId: string;
+  month: string;
+  kind: DueKind;
+  paidAt: string;
+  enteredById: string;
+  enteredByName: string;
+};
+
+export type LedgerEntry = {
+  id: string;
+  date: string;
+  amount: number;
+  direction: "income" | "expense";
+  account: MoneyAccount;
+  category: LedgerCategory;
+  description: string;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  hasReceipt?: boolean;
+  receiptUserId?: string;
+  receiptRev?: number;
+  source?: "dues" | "stash" | "manual";
+  dueUserId?: string;
+  dueMonth?: string;
+  dueKind?: DueKind;
+  donorUserId?: string;
+  donorName?: string;
+};
+
+export type Treasury = {
+  rentaAmount: number;
+  bankAmount: number;
+  dues: DuePayment[];
+  entries: LedgerEntry[];
+};
+
 export type AppData = {
   attendance: Attendance[];
   notifications: NotificationItem[];
@@ -249,6 +291,7 @@ export type AppData = {
   members: Member[];
   pendingRequests: Member[];
   dailyDarts: PublicDailyDarts;
+  treasury: Treasury;
 };
 
 export type StoredUser = UserPublic & { passwordHash: string };
@@ -271,6 +314,7 @@ export type Db = {
   settings: Settings;
   pushSubs: PushSub[];
   dailyDarts: DailyDartsState;
+  treasury: Treasury;
 };
 
 export type Action =
@@ -294,6 +338,13 @@ export type Action =
   | { op: "saveGame"; game: Omit<SavedGame, "id" | "hasProof" | "proofUserId" | "proofRev"> & { id?: string } }
   | { op: "deleteGame"; id: string }
   | { op: "setGameProof"; id: string; hasProof: boolean }
+  | { op: "setDueAmounts"; renta: number; bank: number }
+  | { op: "toggleDue"; userId: string; month: string; kind: DueKind }
+  | { op: "addStash"; id?: string; date: string; amount: number; donorUserId?: string }
+  | { op: "addLedger"; entry: Omit<LedgerEntry, "createdById" | "createdByName" | "createdAt" | "hasReceipt" | "receiptUserId" | "receiptRev" | "source" | "dueUserId" | "dueMonth" | "dueKind" | "donorUserId" | "donorName"> & { id?: string } }
+  | { op: "updateLedger"; entry: Pick<LedgerEntry, "id" | "date" | "amount" | "direction" | "account" | "category" | "description"> }
+  | { op: "deleteLedger"; id: string }
+  | { op: "setLedgerReceipt"; id: string; hasReceipt: boolean }
   | { op: "setRole"; userId: string; role: Role }
   | { op: "approveUser"; userId: string }
   | { op: "rejectUser"; userId: string }
