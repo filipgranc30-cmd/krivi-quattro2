@@ -1,4 +1,4 @@
-import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, monthLabel, normalizeTreasury, roundEur, treasuryBalance } from "./blagajna";
+import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, isTreasurer, monthLabel, normalizeTreasury, roundEur, treasuryBalance } from "./blagajna";
 import { todayZagreb } from "./dates";
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import { PROOF_ID } from "./proof";
@@ -38,6 +38,10 @@ function validDue(value: number): boolean {
 
 function requireAdmin(actor: UserPublic): string | null {
   return actor.role === "admin" ? null : "Samo trener ili admin može mijenjati ove podatke.";
+}
+
+function requireTreasurer(actor: UserPublic): string | null {
+  return isTreasurer(actor) ? null : "Samo Filip može mijenjati blagajnu.";
 }
 
 function trimNotifications(db: Db) {
@@ -298,7 +302,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "setDueAmounts": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       if (!validDue(action.renta) || !validDue(action.bank)) return { db, error: "Iznos nije ispravan." };
       next.treasury.rentaAmount = roundEur(action.renta);
@@ -306,7 +310,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "toggleDue": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       if (action.kind !== "renta" && action.kind !== "racun") return { db, error: "Nepoznata uplata." };
       if (!isSeasonMonth(action.month)) return { db, error: "Nepoznat mjesec sezone." };
@@ -347,7 +351,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "addStash": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       if (!/^\d{4}-\d{2}-\d{2}$/.test(action.date || "")) return { db, error: "Datum nije ispravan." };
       if (!Number.isFinite(action.amount) || action.amount <= 0 || action.amount > 100000) return { db, error: "Iznos nije ispravan." };
@@ -373,7 +377,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "setBalance": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       if (action.account !== "cash" && action.account !== "bank") return { db, error: "Nepoznat račun." };
       if (!Number.isFinite(action.amount) || Math.abs(action.amount) > 1000000) return { db, error: "Iznos nije ispravan." };
@@ -397,7 +401,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "addLedger": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       const entry = sanitizeLedger(action.entry);
       if (!entry) return { db, error: "Unos blagajne nije ispravan." };
@@ -414,7 +418,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "updateLedger": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       const current = next.treasury.entries.find((item) => item.id === action.entry.id);
       if (!current) return { db, error: "Unos nije pronađen." };
@@ -430,7 +434,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "deleteLedger": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       const current = next.treasury.entries.find((item) => item.id === action.id);
       if (!current) return { db, error: "Unos nije pronađen." };
@@ -441,7 +445,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       return { db: next };
     }
     case "setLedgerReceipt": {
-      const denied = requireAdmin(actor);
+      const denied = requireTreasurer(actor);
       if (denied) return { db, error: denied };
       if (!PROOF_ID.test(action.id)) return { db, error: "Nepoznat unos." };
       const entry = next.treasury.entries.find((item) => item.id === action.id);

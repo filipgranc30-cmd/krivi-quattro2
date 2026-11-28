@@ -5,6 +5,12 @@ export const SEASON_MONTHS = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-
 
 export const DEFAULT_RENTA = 25;
 export const DEFAULT_BANK = 10;
+/** Filip Granc's account. Only this email may change the treasury. */
+export const TREASURER_EMAIL = "filipgranc30@gmail.com";
+
+export function isTreasurer(user: { email?: string | null } | null | undefined): boolean {
+  return (user?.email || "").trim().toLowerCase() === TREASURER_EMAIL;
+}
 
 export const LEDGER_CATEGORIES: { id: LedgerCategory; label: string }[] = [
   { id: "renta", label: "Renta aparata" },
@@ -88,7 +94,11 @@ export function duesStatus(treasury: Treasury, members: { id: string; name: stri
 export type MonthTotals = { month: string; income: number; expense: number };
 
 export type TreasuryBalance = {
+  /** Manual cash only. Renta and stash do not move this. */
   cash: number;
+  /** Sum of paid renta aparata toggles. */
+  aparati: number;
+  /** Manual bank starting balance plus paid association transfers. */
   bank: number;
   total: number;
   stash: number;
@@ -98,40 +108,31 @@ export type TreasuryBalance = {
 };
 
 export function treasuryBalance(treasury: Treasury): TreasuryBalance {
-  const season = new Set<string>(SEASON_MONTHS);
-  const byMonth = new Map<string, MonthTotals>();
-  for (const month of SEASON_MONTHS) byMonth.set(month, { month, income: 0, expense: 0 });
   let cash = 0;
+  let aparati = 0;
   let bank = 0;
   let stash = 0;
-  let seasonIncome = 0;
-  let seasonExpense = 0;
   for (const entry of treasury.entries) {
     const amount = roundEur(entry.amount);
     const signed = entry.direction === "income" ? amount : -amount;
-    if (entry.account === "bank") bank += signed;
-    else cash += signed;
+    if (entry.source === "balance" && entry.account === "cash") cash += signed;
+    if (entry.source === "dues" && entry.dueKind === "renta") aparati += signed;
+    if (entry.source === "balance" && entry.account === "bank") bank += signed;
+    if (entry.source === "dues" && entry.dueKind === "racun") bank += signed;
     if (entry.category === "stash" && entry.direction === "income") stash += amount;
-    if (entry.source === "balance") continue;
-    const month = entry.date.slice(0, 7);
-    if (!season.has(month)) continue;
-    if (entry.direction === "income") seasonIncome += amount;
-    else seasonExpense += amount;
-    const row = byMonth.get(month);
-    if (!row) continue;
-    if (entry.direction === "income") row.income = roundEur(row.income + amount);
-    else row.expense = roundEur(row.expense + amount);
   }
   cash = roundEur(cash);
+  aparati = roundEur(aparati);
   bank = roundEur(bank);
   return {
     cash,
+    aparati,
     bank,
-    total: roundEur(cash + bank),
+    total: roundEur(cash + aparati + bank),
     stash: roundEur(stash),
-    seasonIncome: roundEur(seasonIncome),
-    seasonExpense: roundEur(seasonExpense),
-    months: [...byMonth.values()],
+    seasonIncome: 0,
+    seasonExpense: 0,
+    months: SEASON_MONTHS.map((month) => ({ month, income: 0, expense: 0 })),
   };
 }
 

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Card, SectionTitle } from "@/components/ui";
-import { formatEur, lastBalanceUpdate, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
+import { formatEur, isTreasurer, lastBalanceUpdate, monthLabel, SEASON_MONTHS, treasuryBalance } from "@/lib/shared/blagajna";
 import { formatDateHr } from "@/lib/shared/dates";
 import type { DueKind } from "@/lib/shared/types";
 
 export default function TreasuryPage() {
   const { data, user, act } = useApp();
-  const admin = user?.role === "admin";
+  const treasurer = isTreasurer(user);
   const balance = treasuryBalance(data.treasury);
   const [rentaInput, setRentaInput] = useState(String(data.treasury.rentaAmount));
   const [bankInput, setBankInput] = useState(String(data.treasury.bankAmount));
@@ -34,16 +34,20 @@ export default function TreasuryPage() {
       <Link href="/vise" className="text-sm text-orange-300">← Više</Link>
       <div>
         <SectionTitle>KLUBSKA BLAGAJNA</SectionTitle>
-        <p className="mt-1 text-sm text-zinc-400">Sezona 2026/27. Renta aparata ide u gotovinu, uplata na račun udruge na žiro. Članovi vide stanje i cijelu tablicu.</p>
+        <p className="mt-1 text-sm text-zinc-400">Sezona 2026/27. Gotovina se upisuje ručno. Aparati su zbroj plaćene rente. Uplate na račun udruge idu na žiro, a početno stanje računa može se upisati.</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <BalanceCard label="Gotovina" value={balance.cash} tone="text-orange-300" updated={lastBalanceUpdate(data.treasury.entries, "cash")} admin={admin} onSave={(amount) => act({ op: "setBalance", account: "cash", amount })} />
-        <BalanceCard label="Račun udruge" value={balance.bank} tone="" updated={lastBalanceUpdate(data.treasury.entries, "bank")} admin={admin} onSave={(amount) => act({ op: "setBalance", account: "bank", amount })} />
+      <div className="grid grid-cols-3 gap-2">
+        <BalanceCard label="Gotovina" value={balance.cash} tone="text-orange-300" updated={lastBalanceUpdate(data.treasury.entries, "cash")} editable={treasurer} onSave={(amount) => act({ op: "setBalance", account: "cash", amount })} />
+        <Card className="p-3">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-500">Aparati</div>
+          <div className="font-display text-xl text-orange-300">{formatEur(balance.aparati)}</div>
+        </Card>
+        <BalanceCard label="Račun udruge" value={balance.bank} tone="" updated={lastBalanceUpdate(data.treasury.entries, "bank")} editable={treasurer} onSave={(amount) => act({ op: "setBalance", account: "bank", amount })} />
       </div>
       <Card>
         <SectionTitle>MJESEČNE UPLATE</SectionTitle>
-        <p className="mt-1 text-xs text-zinc-500">Narančasto je renta aparata ({formatEur(data.treasury.rentaAmount)}, gotovina). Plavo je uplata na račun ({formatEur(data.treasury.bankAmount)}).</p>
-        {admin && (
+        <p className="mt-1 text-xs text-zinc-500">Narančasto A je renta aparata ({formatEur(data.treasury.rentaAmount)}). Plavo U je uplata na račun ({formatEur(data.treasury.bankAmount)}).</p>
+        {treasurer && (
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="text-xs text-zinc-400">Renta aparata
               <input value={rentaInput} onChange={(event) => setRentaInput(event.target.value)} inputMode="decimal" className="mt-1 block h-10 w-24 rounded-xl border border-white/15 bg-black px-2 text-sm text-white" />
@@ -72,8 +76,8 @@ export default function TreasuryPage() {
                     {SEASON_MONTHS.map((month) => (
                       <td key={month} className="px-1 py-1">
                         <div className="flex justify-center gap-1">
-                          <DueMark kind="renta" admin={admin} busy={busy} payment={data.treasury.dues.find((item) => item.userId === member.id && item.month === month && item.kind === "renta")} onToggle={() => void toggle(member.id, month, "renta")} />
-                          <DueMark kind="racun" admin={admin} busy={busy} payment={data.treasury.dues.find((item) => item.userId === member.id && item.month === month && item.kind === "racun")} onToggle={() => void toggle(member.id, month, "racun")} />
+                          <DueMark kind="renta" interactive={treasurer} busy={busy} payment={data.treasury.dues.find((item) => item.userId === member.id && item.month === month && item.kind === "renta")} onToggle={() => void toggle(member.id, month, "renta")} />
+                          <DueMark kind="racun" interactive={treasurer} busy={busy} payment={data.treasury.dues.find((item) => item.userId === member.id && item.month === month && item.kind === "racun")} onToggle={() => void toggle(member.id, month, "racun")} />
                         </div>
                       </td>
                     ))}
@@ -93,14 +97,14 @@ function BalanceCard({
   value,
   tone,
   updated,
-  admin,
+  editable,
   onSave,
 }: {
   label: string;
   value: number;
   tone: string;
   updated?: { date: string; createdByName: string };
-  admin: boolean;
+  editable: boolean;
   onSave: (amount: number) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(false);
@@ -120,13 +124,8 @@ function BalanceCard({
     <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
-        {admin && !open && (
-          <button type="button" className="text-[11px] font-semibold text-orange-300" onClick={() => { setInput(String(value).replace(".", ",")); setOpen(true); }}>
-            Uredi
-          </button>
-        )}
       </div>
-      {open ? (
+      {open && editable ? (
         <div className="mt-2 space-y-2">
           <input value={input} onChange={(event) => setInput(event.target.value)} inputMode="decimal" aria-label={label} className="h-10 w-full rounded-xl border border-white/15 bg-black px-2 text-sm" />
           {error && <p className="text-xs text-red-300">{error}</p>}
@@ -136,17 +135,26 @@ function BalanceCard({
           </div>
         </div>
       ) : (
-        <div className={`font-display text-xl ${tone}`}>{formatEur(value)}</div>
+        editable ? (
+          <button type="button" aria-label={label} className={`font-display w-full text-left text-xl ${tone}`} onClick={() => { setInput(String(value).replace(".", ",")); setOpen(true); }}>
+            {formatEur(value)}
+          </button>
+        ) : (
+          <div className={`font-display text-xl ${tone}`}>{formatEur(value)}</div>
+        )
       )}
       {updated && <p className="mt-1 text-[11px] text-zinc-500">zadnje ažuriranje: {formatDateHr(updated.date)}, {updated.createdByName}</p>}
     </Card>
   );
 }
 
-function DueMark({ kind, admin, busy, payment, onToggle }: { kind: DueKind; admin: boolean; busy: boolean; payment?: { paidAt: string; enteredByName: string }; onToggle: () => void }) {
+function DueMark({ kind, interactive, busy, payment, onToggle }: { kind: DueKind; interactive: boolean; busy: boolean; payment?: { paidAt: string; enteredByName: string }; onToggle: () => void }) {
   const paid = Boolean(payment);
   const title = `${kind === "renta" ? "Renta aparata" : "Uplata na račun"}${payment ? `: plaćeno ${payment.paidAt.slice(0, 10)}, upisao ${payment.enteredByName}` : ": nije plaćeno"}`;
   const tone = kind === "renta" ? (paid ? "bg-orange-500 text-black" : "border border-orange-500/40 text-orange-200") : paid ? "bg-sky-400 text-black" : "border border-sky-400/40 text-sky-200";
-  if (!admin) return <span title={title} className={`grid h-7 w-7 place-items-center rounded-md text-[10px] font-bold ${tone}`}>{paid ? "✓" : kind === "renta" ? "A" : "U"}</span>;
-  return <button type="button" disabled={busy} title={title} onClick={onToggle} className={`grid h-7 w-7 place-items-center rounded-md text-[10px] font-bold ${tone}`}>{paid ? "✓" : kind === "renta" ? "A" : "U"}</button>;
+  const mark = paid ? "✓" : kind === "renta" ? "A" : "U";
+  if (!interactive) {
+    return <span title={title} className={`pointer-events-none grid h-7 w-7 cursor-default select-none place-items-center rounded-md text-[10px] font-bold ${tone}`}>{mark}</span>;
+  }
+  return <button type="button" disabled={busy} title={title} onClick={onToggle} className={`grid h-7 w-7 place-items-center rounded-md text-[10px] font-bold ${tone}`}>{mark}</button>;
 }
