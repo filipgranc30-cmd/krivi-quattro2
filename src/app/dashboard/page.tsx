@@ -9,6 +9,7 @@ import { VijestiTeaser } from "@/components/vijesti-teaser";
 import { TurniriTeaser } from "@/components/turniri-teaser";
 import { ZapisnikLink } from "@/components/zapisnik-link";
 import { MemberName, MemberNames } from "@/components/member-name";
+import { IosInstallBanner } from "@/components/ios-install-banner";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
 import { formatDateHr, formatWhen, todayZagreb, weekdayName } from "@/lib/shared/dates";
 import { leagueBadge, nextMatch, opponentBoard } from "@/lib/shared/schedule";
@@ -63,6 +64,8 @@ export default function DashboardPage() {
         </div>
         <div className={`text-xs ${badge.demo ? "text-zinc-400" : "text-black/70"}`}>{badge.detail}</div>
       </div>
+
+      <IosInstallBanner />
 
       {snapshotError && (
         <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{snapshotError}</p>
