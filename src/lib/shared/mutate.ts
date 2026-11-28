@@ -133,7 +133,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
           action.kind === "training"
             ? `${firstName(actor.name)} dolazi na trening u ${label || "zakazani termin"}`
             : `${firstName(actor.name)} dolazi na utakmicu: ${label || "sljedeći susret"}`;
-        const href = action.kind === "training" ? "/trening" : "/dashboard";
+        const href = action.kind === "training" ? "/trening/dolasci" : "/dashboard";
         notifyOthers(next, actor, "Dolazak", body, href);
         push = { title: "Krivi Quattro", body, url: href };
       }
