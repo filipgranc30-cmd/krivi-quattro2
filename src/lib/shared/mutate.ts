@@ -1,4 +1,5 @@
 import { dueAccount, dueAmount, dueEntryMatch, isLedgerCategory, isSeasonMonth, isTreasurer, monthLabel, normalizeTreasury, plainIban, roundEur, treasuryBalance, validIban } from "./blagajna";
+import { buildClubElo, markCountedGames, normalizeElo } from "./elo";
 import { todayZagreb } from "./dates";
 import { applyDailyAction, cloneDailyDarts, publicDailyDarts } from "./daily-darts";
 import { PROOF_ID } from "./proof";
@@ -128,6 +129,10 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
     pushSubs: db.pushSubs.map((item) => ({ ...item })),
     dailyDarts: cloneDailyDarts(db.dailyDarts),
     treasury: normalizeTreasury(db.treasury),
+    elo: {
+      ...normalizeElo(db.elo),
+      challenges: normalizeElo(db.elo).challenges.map((item) => ({ ...item })),
+    },
   };
 
   switch (action.op) {
@@ -299,6 +304,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
         })),
       });
       if (next.games.length > 400) next.games = next.games.slice(-400);
+      syncEloMarks(next);
       return { db: next };
     }
     case "setDueAmounts": {
@@ -505,6 +511,7 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       const playedByActor = game.players.some((player) => player.userId === actor.id);
       if (actor.role !== "admin" && !playedByActor) return { db, error: "Ne možeš obrisati tu igru." };
       next.games = next.games.filter((item) => item.id !== action.id);
+      syncEloMarks(next);
       return { db: next };
     }
     case "setRole": {
@@ -557,9 +564,138 @@ export function applyAction(db: Db, actor: UserPublic, action: Action): MutateRe
       next.attendance = next.attendance.filter((item) => item.userId !== user.id);
       return { db: next };
     }
+    case "eloChallenge":
+    case "eloRespond":
+    case "eloReport":
+    case "eloConfirm":
+    case "eloVoid":
+    case "eloRecompute":
+    case "eloSettings":
+      return applyEloAction(next, actor, action);
     default:
       return { db, error: "Nepoznata radnja." };
   }
+}
+
+function syncEloMarks(db: Db) {
+  markCountedGames(db.games, buildClubElo({ games: db.games, elo: db.elo, members: activeMembers(db) }).countedGameIds);
+}
+
+function activeMembers(db: Db) {
+  return db.users.filter((user) => accountStatus(user) === "active").map((user) => ({ id: user.id, name: user.name }));
+}
+
+function applyEloAction(db: Db, actor: UserPublic, action: Action): MutateResult {
+  const active = activeMembers(db);
+  const findMember = (id: string) => active.find((member) => member.id === id);
+  if (action.op === "eloSettings") {
+    const denied = requireAdmin(actor);
+    if (denied) return { db, error: denied };
+    const start = Math.round(Number(action.startRating));
+    if (!Number.isFinite(start) || start < 100 || start > 3000) return { db, error: "Početni rejting je od 100 do 3000." };
+    db.elo.startRating = start;
+    db.elo.trainingCounts = Boolean(action.trainingCounts);
+    syncEloMarks(db);
+    return { db };
+  }
+  if (action.op === "eloRecompute") {
+    const denied = requireAdmin(actor);
+    if (denied) return { db, error: denied };
+    syncEloMarks(db);
+    return { db };
+  }
+  if (action.op === "eloVoid") {
+    const denied = requireAdmin(actor);
+    if (denied) return { db, error: denied };
+    if (action.source === "training") {
+      const game = db.games.find((item) => item.id === action.id);
+      if (!game) return { db, error: "Meč nije pronađen." };
+      game.eloExclude = true;
+      syncEloMarks(db);
+      return { db };
+    }
+    const challenge = db.elo.challenges.find((item) => item.id === action.id);
+    if (!challenge) return { db, error: "Izazov nije pronađen." };
+    challenge.status = "void";
+    syncEloMarks(db);
+    return { db };
+  }
+  if (action.op === "eloChallenge") {
+    const opponent = findMember(action.opponentId);
+    if (!opponent || opponent.id === actor.id) return { db, error: "Odaberi drugog člana." };
+    const open = db.elo.challenges.some(
+      (item) =>
+        (item.status === "pending" || item.status === "accepted" || item.status === "reported") &&
+        ((item.challengerId === actor.id && item.opponentId === opponent.id) ||
+          (item.challengerId === opponent.id && item.opponentId === actor.id)),
+    );
+    if (open) return { db, error: "Već imate otvoren izazov." };
+    const format = clampText(action.format || "", 40);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(action.date || "") ? action.date : "";
+    const id = uid();
+    db.elo.challenges.push({
+      id,
+      createdAt: new Date().toISOString(),
+      challengerId: actor.id,
+      challengerName: actor.name,
+      opponentId: opponent.id,
+      opponentName: opponent.name,
+      format,
+      date,
+      status: "pending",
+    });
+    const body = `${actor.name} te izaziva${format ? ` (${format})` : ""}.`;
+    notifyUsers(db, [opponent.id], "Izazov", body, "/elo");
+    return { db, push: { title: "Krivi Quattro", body, url: "/elo", userIds: [opponent.id] } };
+  }
+  if (action.op === "eloRespond") {
+    const challenge = db.elo.challenges.find((item) => item.id === action.id);
+    if (!challenge || challenge.status !== "pending") return { db, error: "Izazov nije otvoren." };
+    if (challenge.opponentId !== actor.id) return { db, error: "Samo izazvani može odgovoriti." };
+    challenge.status = action.accept ? "accepted" : "declined";
+    const body = action.accept ? `${actor.name} prihvaća izazov.` : `${actor.name} odbija izazov.`;
+    notifyUsers(db, [challenge.challengerId], "Izazov", body, "/elo");
+    return { db, push: { title: "Krivi Quattro", body, url: "/elo", userIds: [challenge.challengerId] } };
+  }
+  if (action.op === "eloReport") {
+    const challenge = db.elo.challenges.find((item) => item.id === action.id);
+    if (!challenge || challenge.status !== "accepted") return { db, error: "Izazov nije prihvaćen." };
+    if (actor.id !== challenge.challengerId && actor.id !== challenge.opponentId) return { db, error: "Nisi sudionik." };
+    const mine = Math.round(Number(action.myLegs));
+    const theirs = Math.round(Number(action.theirLegs));
+    if (!Number.isInteger(mine) || !Number.isInteger(theirs) || mine < 0 || theirs < 0 || mine > 30 || theirs > 30 || mine === theirs) {
+      return { db, error: "Upiši legove. Nema neriješenog." };
+    }
+    if (actor.id === challenge.challengerId) {
+      challenge.legsChallenger = mine;
+      challenge.legsOpponent = theirs;
+    } else {
+      challenge.legsOpponent = mine;
+      challenge.legsChallenger = theirs;
+    }
+    challenge.reportedById = actor.id;
+    challenge.reportedAt = new Date().toISOString();
+    challenge.status = "reported";
+    const other = actor.id === challenge.challengerId ? challenge.opponentId : challenge.challengerId;
+    const body = `${actor.name} upisao je rezultat ${challenge.legsChallenger}:${challenge.legsOpponent}. Potvrdi ga.`;
+    notifyUsers(db, [other], "Rezultat", body, "/elo");
+    return { db, push: { title: "Krivi Quattro", body, url: "/elo", userIds: [other] } };
+  }
+  if (action.op === "eloConfirm") {
+    const challenge = db.elo.challenges.find((item) => item.id === action.id);
+    if (!challenge || challenge.status !== "reported") return { db, error: "Nema rezultata za potvrdu." };
+    const other = challenge.reportedById === challenge.challengerId ? challenge.opponentId : challenge.challengerId;
+    const allowed = actor.id === other || (isTreasurer(actor) && actor.id !== challenge.reportedById);
+    if (!allowed) return { db, error: "Rezultat potvrđuje drugi igrač ili Filip." };
+    challenge.status = "confirmed";
+    challenge.confirmedById = actor.id;
+    challenge.confirmedAt = new Date().toISOString();
+    syncEloMarks(db);
+    const body = `Rejting je ažuriran: ${challenge.challengerName} ${challenge.legsChallenger}:${challenge.legsOpponent} ${challenge.opponentName}.`;
+    notifyUsers(db, [challenge.challengerId, challenge.opponentId], "ELO", body, "/elo");
+    return { db, push: { title: "Krivi Quattro", body, url: "/elo", userIds: [challenge.challengerId, challenge.opponentId] } };
+  }
+  return { db, error: "Nepoznata radnja." };
 }
 
 function sanitizeFixture(input: Omit<import("./types").ManualFixture, "id"> | import("./types").ManualFixture) {
@@ -666,6 +802,7 @@ export function toPublic(db: Db, viewer: UserPublic | null): AppData {
     pendingRequests,
     dailyDarts: publicDailyDarts(db.dailyDarts, viewer),
     treasury: normalizeTreasury(db.treasury),
+    elo: normalizeElo(db.elo),
   };
 }
 

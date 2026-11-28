@@ -5,6 +5,7 @@ import { ProofLightbox, ProofThumb } from "@/components/highscore-proof";
 import { MemberName, MemberNames } from "@/components/member-name";
 import { SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
+import { buildClubElo } from "@/lib/shared/elo";
 import { trainingBoards, trainingPlayers, type ScoreProof, type TrainingBoard } from "@/lib/shared/training-rank";
 import { normName } from "@/lib/shared/util";
 import { useApp } from "./app-provider";
@@ -20,7 +21,11 @@ export function HighScoreStandings() {
 }
 
 export function TrainingBoardPanel({ board, heading }: { board: TrainingBoard; heading?: string }) {
-  const { user } = useApp();
+  const { data, user } = useApp();
+  const counted = useMemo(
+    () => new Set(buildClubElo({ games: data.games, elo: data.elo, members: data.members }).countedGameIds),
+    [data.games, data.elo, data.members],
+  );
   const [openId, setOpenId] = useState<string | null>(null);
   const [proof, setProof] = useState<ScoreProof | null>(null);
   const mine = (name: string, userId?: string) =>
@@ -86,6 +91,7 @@ export function TrainingBoardPanel({ board, heading }: { board: TrainingBoard; h
                         onOpen={() => setProof({ id: match.id, rev: match.proofRev ?? 0, userId: match.proofUserId })}
                       />
                     )}
+                    {counted.has(match.id) && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-semibold text-orange-300">ELO</span>}
                     <span className="font-semibold text-orange-300">{match.score}</span>
                   </span>
                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { BlagajnaTeaser } from "@/components/blagajna-teaser";
 import { DailyDartsTeaser } from "@/components/daily-darts-teaser";
@@ -12,6 +12,7 @@ import { MemberName, MemberNames } from "@/components/member-name";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 import { AttendancePanel, Card, SectionTitle } from "@/components/ui";
 import { formatDateHr, formatWhen, todayZagreb, weekdayName } from "@/lib/shared/dates";
+import { buildClubElo } from "@/lib/shared/elo";
 import { leagueBadge, nextMatch, opponentBoard } from "@/lib/shared/schedule";
 import type { AttendanceStatus } from "@/lib/shared/types";
 import { PSGZ_ORIGIN } from "@/lib/shared/club";
@@ -37,6 +38,10 @@ export default function DashboardPage() {
   const training = data.attendance.filter((item) => item.kind === "training" && item.targetId === today);
   const trainingComing = training.filter((item) => item.status === "dolazim").map((item) => item.userName);
   const trainingAbsent = training.filter((item) => item.status === "ne_dolazim").map((item) => item.userName);
+  const eloTop = useMemo(
+    () => buildClubElo({ games: data.games, elo: data.elo, members: data.members }).standings.slice(0, 3),
+    [data.games, data.elo, data.members],
+  );
 
   const setStatus = async (status: AttendanceStatus | null) => {
     if (!match || !when) return;
@@ -66,6 +71,22 @@ export default function DashboardPage() {
       </div>
 
       <IosInstallBanner />
+
+      <Link href="/elo" className="block rounded-2xl border border-white/10 bg-[#141418] p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <SectionTitle>ELO</SectionTitle>
+          <span className="text-xs font-semibold text-orange-300">Rang lista</span>
+        </div>
+        <ol className="mt-2 space-y-1 text-sm">
+          {eloTop.map((row, index) => (
+            <li key={row.userId} className="flex justify-between gap-3">
+              <span>{index + 1}. <MemberName name={row.name} /></span>
+              <span className="font-display text-orange-300">{row.rating}</span>
+            </li>
+          ))}
+          {!eloTop.length && <li className="text-zinc-500">Nema članova.</li>}
+        </ol>
+      </Link>
 
       {snapshotError && (
         <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{snapshotError}</p>

@@ -6,6 +6,7 @@ import { useApp } from "./app-provider";
 
 const NAV = [
   { href: "/dashboard", label: "Naslovnica", icon: HomeIcon },
+  { href: "/elo", label: "ELO", icon: EloIcon },
   { href: "/lige/818", label: "Ljestvice", icon: TrophyIcon },
   { href: "/rezultati", label: "Rezultati", icon: ListIcon },
   { href: "/vise", label: "Više", icon: MenuIcon },
@@ -41,12 +42,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
       )}
       <main className="px-4 pb-28 pt-4">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/95 backdrop-blur">
-        <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1">
+        <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1">
           {NAV.map((item) => {
             const active = path === item.href || (item.href !== "/dashboard" && path.startsWith(item.href));
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] ${active ? "text-orange-400" : "text-zinc-500"}`}>
+              <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] ${active ? "text-orange-400" : "text-zinc-500"}`}>
                 <span className="relative">
                   <Icon active={active} />
                   {item.href === "/vise" && pendingCount > 0 && (
@@ -69,6 +70,14 @@ function HomeIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8">
       <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
+    </svg>
+  );
+}
+function EloIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M5 19V10M12 19V5M19 19v-7" strokeLinecap="round" />
+      {active && <path d="M5 19V10M12 19V5M19 19v-7" strokeLinecap="round" strokeWidth="2.4" />}
     </svg>
   );
 }
