@@ -122,6 +122,10 @@ export type SavedGame = {
   playedAt: string;
   summary: string;
   players: GamePlayerResult[];
+  /** High score only. The JPEG lives in Redis at hs:proof:{id}, not on this row. */
+  hasProof?: boolean;
+  proofUserId?: string;
+  proofRev?: number;
 };
 
 export type Settings = {
@@ -287,8 +291,9 @@ export type Action =
   | { op: "deleteRoster"; id: string }
   | { op: "setScout"; scout: OpponentScout }
   | { op: "deleteScout"; club: string }
-  | { op: "saveGame"; game: Omit<SavedGame, "id"> }
+  | { op: "saveGame"; game: Omit<SavedGame, "id" | "hasProof" | "proofUserId" | "proofRev"> & { id?: string } }
   | { op: "deleteGame"; id: string }
+  | { op: "setGameProof"; id: string; hasProof: boolean }
   | { op: "setRole"; userId: string; role: Role }
   | { op: "approveUser"; userId: string }
   | { op: "rejectUser"; userId: string }

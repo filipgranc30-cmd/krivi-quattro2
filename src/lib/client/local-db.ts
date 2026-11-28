@@ -1,3 +1,4 @@
+import { clearLocalProofs, deleteLocalProof, pruneLocalProofs } from "./local-proof";
 import { applyAction, publicUser, registerAccount, toPublic } from "../shared/mutate";
 import { emptyDb, stripDemoData } from "../shared/seed";
 import type { Action, AppData, Db, UserPublic } from "../shared/types";
@@ -109,10 +110,13 @@ export function localMutate(actor: UserPublic, action: Action): { data: AppData;
     if (updated) actor = publicUser(updated);
   }
   write(result.db);
+  if (action.op === "setGameProof" && !action.hasProof) deleteLocalProof(action.id);
+  pruneLocalProofs(new Set(result.db.games.map((game) => game.id)));
   return { data: toPublic(result.db, actor) };
 }
 
 export function localReset() {
   localStorage.removeItem(DB_KEY);
   localStorage.removeItem(SESSION_KEY);
+  clearLocalProofs();
 }

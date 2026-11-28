@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { ProofLightbox, ProofThumb } from "@/components/highscore-proof";
 import { SectionTitle } from "@/components/ui";
 import { formatWhen } from "@/lib/shared/dates";
-import { trainingBoards, trainingPlayers, type TrainingBoard } from "@/lib/shared/training-rank";
+import { trainingBoards, trainingPlayers, type ScoreProof, type TrainingBoard } from "@/lib/shared/training-rank";
 import { normName } from "@/lib/shared/util";
 
 export default function TrainingStatsPage() {
@@ -16,6 +17,7 @@ export default function TrainingStatsPage() {
   }, [data.games, data.members, data.roster, user]);
   const [tab, setTab] = useState<TrainingBoard["type"]>("501");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [proof, setProof] = useState<ScoreProof | null>(null);
   const board = boards.find((item) => item.type === tab) ?? boards[0];
   const mine = (name: string, userId?: string) =>
     Boolean(user && (normName(name) === normName(user.name) || userId === user.id));
@@ -62,7 +64,12 @@ export default function TrainingStatsPage() {
               return (
                 <tr key={row.name} className={`${bg} ${highlighted ? "text-orange-100" : ""}`}>
                   <td className={`sticky left-0 z-10 ${bg} border-t border-white/10 px-2 py-2 tabular-nums text-zinc-400`}>{row.rank}</td>
-                  <td className={`sticky left-8 z-10 ${bg} border-t border-white/10 px-2 py-2 font-semibold`}>{row.name}</td>
+                  <td className={`sticky left-8 z-10 ${bg} border-t border-white/10 px-2 py-2 font-semibold`}>
+                    <span className="inline-flex items-center gap-2">
+                      {row.name}
+                      {board.type === "highscore" && row.proof && <ProofThumb proof={row.proof} onOpen={() => setProof(row.proof ?? null)} />}
+                    </span>
+                  </td>
                   {row.values.map((value, index) => (
                     <td key={`${row.name}-${board.columns[index]?.label}`} className="border-t border-white/10 px-2 py-2 text-right tabular-nums">
                       {value}
@@ -82,9 +89,17 @@ export default function TrainingStatsPage() {
           return (
             <div key={match.id} className="rounded-xl border border-white/10">
               <button type="button" className="w-full px-3 py-2 text-left" onClick={() => setOpenId(open ? null : match.id)}>
-                <div className="flex justify-between gap-3 text-xs text-zinc-400">
+                <div className="flex items-center justify-between gap-3 text-xs text-zinc-400">
                   <span>{when.date} {when.time}</span>
-                  <span className="font-semibold text-orange-300">{match.score}</span>
+                  <span className="flex items-center gap-2">
+                    {board.type === "highscore" && match.hasProof && (
+                      <ProofThumb
+                        proof={{ id: match.id, rev: match.proofRev ?? 0, userId: match.proofUserId }}
+                        onOpen={() => setProof({ id: match.id, rev: match.proofRev ?? 0, userId: match.proofUserId })}
+                      />
+                    )}
+                    <span className="font-semibold text-orange-300">{match.score}</span>
+                  </span>
                 </div>
                 <div className="mt-1 text-sm">{match.players}</div>
                 <div className="text-xs text-zinc-400">{match.averages}</div>
@@ -111,6 +126,7 @@ export default function TrainingStatsPage() {
         })}
         {!board.matches.length && <p className="text-sm text-zinc-400">Još nema spremljenih mečeva.</p>}
       </div>
+      {proof && <ProofLightbox proof={proof} onClose={() => setProof(null)} onChanged={() => setProof(null)} />}
     </div>
   );
 }

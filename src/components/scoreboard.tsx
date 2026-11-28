@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { deleteHighScoreProof, saveHighScoreProof } from "@/lib/client/proof-api";
+import { prepareProofImage } from "@/lib/client/proof-image";
+import { uid } from "@/lib/shared/util";
 import { suggestCheckout } from "@/lib/shared/checkout";
 import { createMarathon, MARATHON_ROUNDS, MARATHON_TARGETS, marathonWinner, throwMarathonDart, type MarathonState } from "@/lib/shared/marathon";
 import { checkoutLabel, firstTo } from "@/lib/shared/quick501";
@@ -741,10 +744,55 @@ function GameTotals({ type, players, rounds }: { type: "highscore"; players: Per
 }
 
 function ResultBox({ type, summary, players }: { type: GameType; summary: string; players: GamePlayerResult[] }) {
-  const { act } = useApp();
+  const { act, mode, refresh } = useApp();
   const router = useRouter();
+  const [gameId] = useState(uid);
+  const [playedAt] = useState(() => new Date().toISOString());
   const [saved, setSaved] = useState(false);
+  const [gameSaved, setGameSaved] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [proof, setProof] = useState<Blob | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const withProof = type === "highscore";
+
+  const pickProof = async (file: File | undefined) => {
+    if (!file) return;
+    setError("");
+    try {
+      const blob = await prepareProofImage(file);
+      if (preview) URL.revokeObjectURL(preview);
+      setProof(blob);
+      setPreview(URL.createObjectURL(blob));
+      if (gameSaved) {
+        setBusy(true);
+        const message = await saveHighScoreProof(mode, gameId, blob, act);
+        setBusy(false);
+        if (message) setError(message);
+        else await refresh();
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sliku nisam mogao otvoriti.");
+    }
+  };
+
+  const clearProof = async () => {
+    setError("");
+    if (gameSaved) {
+      setBusy(true);
+      const message = await deleteHighScoreProof(mode, gameId, act);
+      setBusy(false);
+      if (message && message !== "Nema dokaza.") {
+        setError(message);
+        return;
+      }
+      await refresh();
+    }
+    if (preview) URL.revokeObjectURL(preview);
+    setProof(null);
+    setPreview(null);
+  };
+
   return (
     <Card>
       <SectionTitle>KRAJ</SectionTitle>
@@ -763,17 +811,63 @@ function ResultBox({ type, summary, players }: { type: GameType; summary: string
           </li>
         ))}
       </ul>
+      {withProof && (
+        <div className="mt-3">
+          {preview && <img src={preview} alt="Odabrani dokaz" className="mb-2 h-24 w-24 rounded-xl object-cover" />}
+          <div className="grid grid-cols-2 gap-2">
+            <label className={`flex h-11 items-center justify-center rounded-xl border border-orange-500/40 text-sm font-bold text-orange-200 ${busy ? "opacity-50" : ""}`}>
+              {preview ? "Zamijeni sliku" : "Dodaj sliku kao dokaz"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                className="sr-only"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  void pickProof(file);
+                }}
+              />
+            </label>
+            {preview && (
+              <button type="button" disabled={busy} onClick={() => void clearProof()} className="h-11 rounded-xl border border-white/15 text-sm font-bold">
+                Ukloni sliku
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">Kamera ili galerija. Slika se smanji prije spremanja.</p>
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <PrimaryButton
-          disabled={saved}
+          disabled={saved || busy}
           onClick={async () => {
-            const message = await act({ op: "saveGame", game: { type, playedAt: new Date().toISOString(), summary, players } });
-            if (message) setError(message);
-            else setSaved(true);
+            setBusy(true);
+            setError("");
+            if (!gameSaved) {
+              const message = await act({ op: "saveGame", game: { id: gameId, type, playedAt, summary, players } });
+              if (message) {
+                setError(message);
+                setBusy(false);
+                return;
+              }
+              setGameSaved(true);
+            }
+            if (withProof && proof) {
+              const message = await saveHighScoreProof(mode, gameId, proof, act);
+              if (message) {
+                setError(`Rezultat je spremljen. ${message}`);
+                setBusy(false);
+                return;
+              }
+            }
+            setSaved(true);
+            setBusy(false);
+            await refresh();
           }}
         >
-          {saved ? "Spremljeno" : "Spremi"}
+          {saved ? "Spremljeno" : gameSaved ? "Spremi sliku" : "Spremi"}
         </PrimaryButton>
         <GhostButton onClick={() => router.push("/trening/statistika")}>Statistika</GhostButton>
       </div>
