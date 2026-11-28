@@ -18,7 +18,7 @@ const TILES = [
   { href: "/statistika", label: "Statistika", text: "Igrači lige" },
   { href: "/momcad", label: "Momčad", text: "Naši igrači" },
   { href: "/raspored", label: "Raspored", text: "Kola i termini" },
-  { href: "/trening", label: "Trening", text: "Igre i dolasci" },
+  { href: "/trening", label: "Trening", text: "Igre i statistika" },
   { href: "/rezultati", label: "Rezultati", text: "Odigrano" },
 ];
 
@@ -66,15 +66,15 @@ export default function DashboardPage() {
         <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{snapshotError}</p>
       )}
 
-      <Card>
+      <Link href="/trening/dolasci" className="block rounded-2xl border border-white/10 bg-[#141418] p-4">
         <div className="flex items-baseline justify-between gap-3">
           <SectionTitle>DANAS NA TRENINGU</SectionTitle>
-          <Link href="/trening" className="text-xs font-semibold text-orange-300">Otvori</Link>
+          <span className="text-xs font-semibold text-orange-300">Otvori</span>
         </div>
         <p className="mt-2 text-xs text-zinc-500">{weekdayName(today)} {formatDateHr(today)} · {data.settings.trainingTime}</p>
         <p className="mt-2 text-sm text-zinc-300">Dolazi: {trainingComing.join(", ") || "nitko"}</p>
         <p className="mt-1 text-sm text-red-300">Ne dolazi: {trainingAbsent.join(", ") || "nitko"}</p>
-      </Card>
+      </Link>
 
       <Card>
         <SectionTitle>SLJEDEĆA UTAKMICA</SectionTitle>
