@@ -1,25 +1,16 @@
 #!/usr/bin/env bash
-# Builds a release APK signed with signing/krivi-quattro.jks and writes public/krivi-quattro.apk.
+# Builds a release APK and writes public/krivi-quattro.apk.
+# Signing prefers ANDROID_KEYSTORE_* env vars. A local signing/ directory is only a fallback and is not committed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/android-sdk}}"
-PROPS="$ROOT/signing/keystore.properties"
 OUT="$ROOT/public/krivi-quattro.apk"
 
 if [[ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" && ! -x "$SDK/cmdline-tools/bin/sdkmanager" ]]; then
   echo "Android SDK not found at $SDK" >&2
   exit 1
 fi
-if [[ ! -f "$PROPS" ]]; then
-  echo "Missing $PROPS" >&2
-  exit 1
-fi
-
-store_password="$(grep '^storePassword=' "$PROPS" | cut -d= -f2-)"
-key_password="$(grep '^keyPassword=' "$PROPS" | cut -d= -f2-)"
-key_alias="$(grep '^keyAlias=' "$PROPS" | cut -d= -f2-)"
-store_file="$(grep '^storeFile=' "$PROPS" | cut -d= -f2-)"
 
 export ANDROID_SDK_ROOT="$SDK"
 export ANDROID_HOME="$SDK"
@@ -27,6 +18,33 @@ export ANDROID_HOME="$SDK"
 work="$(mktemp -d)"
 cleanup() { rm -rf "$work"; }
 trap cleanup EXIT
+
+sign_mode="unsigned"
+keystore=""
+if [[ -n "${ANDROID_KEYSTORE_B64:-}" && -n "${ANDROID_KEYSTORE_PASSWORD:-}" && -n "${ANDROID_KEY_ALIAS:-}" ]]; then
+  keystore="$work/release.jks"
+  printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$keystore"
+  if [[ -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+    export ANDROID_KEY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+  fi
+  sign_mode="env"
+elif [[ -f "$ROOT/signing/keystore.properties" && -d "$ROOT/signing" ]]; then
+  props="$ROOT/signing/keystore.properties"
+  store_password="$(grep '^storePassword=' "$props" | cut -d= -f2-)"
+  key_password="$(grep '^keyPassword=' "$props" | cut -d= -f2-)"
+  key_alias="$(grep '^keyAlias=' "$props" | cut -d= -f2-)"
+  store_file="$(grep '^storeFile=' "$props" | cut -d= -f2-)"
+  keystore="$ROOT/signing/$store_file"
+  if [[ ! -f "$keystore" ]]; then
+    echo "Local keystore file is missing; building unsigned." >&2
+    sign_mode="unsigned"
+  else
+    export ANDROID_KEYSTORE_PASSWORD="$store_password"
+    export ANDROID_KEY_PASSWORD="${key_password:-$store_password}"
+    export ANDROID_KEY_ALIAS="$key_alias"
+    sign_mode="local"
+  fi
+fi
 
 mkdir -p "$work/www"
 cat > "$work/www/index.html" << 'HTML'
@@ -75,12 +93,13 @@ python3 "$ROOT/scripts/android-icons.py" "$work/android/app/src/main/res" "$ROOT
 
 gradle_file="$work/android/app/build.gradle"
 python3 - "$gradle_file" << 'PY'
-import pathlib, sys
+import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
-text2 = text.replace("versionCode 1", "versionCode 2", 1).replace('versionName "1.0"', 'versionName "1.1.0"', 1)
-if 'versionCode 2' not in text2 or 'versionName "1.1.0"' not in text2:
-    raise SystemExit("Could not set versionCode 2 / versionName 1.1.0 in " + str(path))
+text2, n1 = re.subn(r"versionCode \d+", "versionCode 3", text, count=1)
+text2, n2 = re.subn(r'versionName "[^"]+"', 'versionName "1.2.0"', text2, count=1)
+if n1 != 1 or n2 != 1:
+    raise SystemExit("Could not set versionCode 3 / versionName 1.2.0 in " + str(path))
 path.write_text(text2)
 print(path)
 PY
@@ -98,11 +117,18 @@ fi
 build_tools="$(find "$SDK/build-tools" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
 aligned="$work/aligned.apk"
 "$build_tools/zipalign" -p -f 4 "$unsigned" "$aligned"
+
+if [[ "$sign_mode" == "unsigned" ]]; then
+  cp "$aligned" "$OUT"
+  echo "Unsigned APK (no signing key): $OUT ($(wc -c < "$OUT") bytes)"
+  exit 0
+fi
+
 "$build_tools/apksigner" sign \
-  --ks "$ROOT/signing/$store_file" \
-  --ks-key-alias "$key_alias" \
-  --ks-pass "pass:$store_password" \
-  --key-pass "pass:$key_password" \
+  --ks "$keystore" \
+  --ks-key-alias "$ANDROID_KEY_ALIAS" \
+  --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+  --key-pass env:ANDROID_KEY_PASSWORD \
   --out "$OUT" \
   "$aligned"
 "$build_tools/apksigner" verify --verbose "$OUT"
